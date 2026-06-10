@@ -896,49 +896,11 @@
 
   /* ── AR 카메라 장면 ── */
   function startAR() {
-    goTo('scene-ar');
-
-    /* 카메라 권한 요청 */
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(function(stream) {
-          const video = document.getElementById('cam-video');
-          video.srcObject = stream;
-          video.style.display = 'block';
-          /* 카메라가 켜지면 배경 SVG 숨김 */
-          document.getElementById('cam-fallback').style.display = 'none';
-        })
-        .catch(function(err) {
-          /* 권한 거부 시 배경 SVG 그대로 보임 */
-          console.log('카메라 접근 불가:', err);
-        });
-    }
+    /* 레시피북을 다 읽으면 ar.html로 이동 */
+    window.location.href = 'ar.html';
   }
 
-  function catchCloud() {
-    const cloud = document.getElementById('ar-cloud');
-    const status = document.getElementById('ar-status');
-
-    /* 구름 잡는 애니메이션 */
-    cloud.style.transition = 'transform 0.2s, opacity 0.4s';
-    cloud.style.transform = 'translateX(-50%) scale(1.4)';
-    status.textContent = '구름 포착! ✓';
-
-    setTimeout(() => {
-      cloud.style.transform = 'translateX(-50%) scale(0)';
-      cloud.style.opacity = '0';
-    }, 250);
-
-    setTimeout(() => {
-      /* 카메라 스트림 종료 */
-      const video = document.getElementById('cam-video');
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach(t => t.stop());
-      }
-      initCookGame();
-      goTo('scene-cook');
-    }, 800);
-  }
+  /* catchCloud는 ar.html에서 처리됨 */
 
 
   /* ── 요리 게임 ── */
@@ -1065,6 +1027,16 @@
   }
 
 
+  /* ── 페이지 로드 시 처리 ── */
+  window.addEventListener('load', function() {
+    // ar.html에서 구름 따고 넘어온 경우
+    if (window.location.hash === '#game' || sessionStorage.getItem('cloud_caught') === 'true') {
+      sessionStorage.removeItem('cloud_caught');
+      initCookGame();
+      goTo('scene-cook');
+    }
+  });
+
   /* ── 다시 시작 ── */
   function restart() {
     /* 레시피북 초기화 */
@@ -1072,12 +1044,6 @@
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('pg-0').classList.add('active');
     updateBookNav();
-
-    /* 구름 다시 보이게 */
-    const cloud = document.getElementById('ar-cloud');
-    cloud.style.transform = 'translateX(-50%)';
-    cloud.style.opacity = '1';
-    cloud.style.transition = '';
 
     goTo('scene-book');
   }
