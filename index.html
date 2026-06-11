@@ -1,1053 +1,451 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>구름빵 — AR 동화책</title>
-  <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Gaegu:wght@400;700&family=Caveat:wght@400;600;700&display=swap" rel="stylesheet" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>구름빵</title>
   <style>
-    /* ────────────────────────────────────────
-       기본 리셋 & 전체 레이아웃
-    ──────────────────────────────────────── */
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-    body {
-      background: #1a1208;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Gaegu', cursive;
-    }
-
-    /* 모든 장면(scene)은 기본적으로 숨김 */
-    .scene { display: none; width: 100%; max-width: 420px; min-height: 100vh; flex-direction: column; }
-    .scene.active { display: flex; }
-
-    /* ────────────────────────────────────────
-       장면 1: 레시피북
-    ──────────────────────────────────────── */
-    #scene-book {
-      background: #2c1e0f;
-      align-items: center;
-      justify-content: center;
-      padding: 24px 16px;
-    }
-
-    .book-wrap { width: 100%; }
-
-    /* 페이지 — 기본적으로 숨김, .active만 보임 */
-    .page {
-      display: none;
-      min-height: 480px;
-      background: #f5ead6;
-      border-radius: 2px 10px 10px 2px;
-      padding: 28px 24px 24px;
-      position: relative;
+    html, body {
+      width: 100%; height: 100%;
       overflow: hidden;
-      /* 줄 노트 배경 */
-      background-image: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 27px,
-        rgba(139,90,43,0.10) 27px,
-        rgba(139,90,43,0.10) 28px
+      background: #1a0f05;
+    }
+
+    /* ── 나무 테이블 배경 ── */
+    #table-bg {
+      position: fixed;
+      inset: 0;
+      background:
+        /* 나뭇결 세로 줄 */
+        repeating-linear-gradient(
+          88deg,
+          transparent 0px,
+          transparent 38px,
+          rgba(0,0,0,0.04) 38px,
+          rgba(0,0,0,0.04) 40px
+        ),
+        /* 나뭇결 가로 */
+        repeating-linear-gradient(
+          180deg,
+          transparent 0px,
+          transparent 90px,
+          rgba(255,255,255,0.015) 90px,
+          rgba(255,255,255,0.015) 92px
+        ),
+        /* 테이블 기본색 */
+        linear-gradient(160deg, #3d2008 0%, #2a1505 40%, #1e0f03 100%);
+      z-index: 0;
+    }
+
+    /* 테이블 위 주변광 */
+    #table-light {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(
+        ellipse 70% 60% at 50% 30%,
+        rgba(255,210,120,0.13) 0%,
+        transparent 70%
       );
-      /* 좌측 제본 그림자 */
-      border-left: 4px solid rgba(80,40,10,0.25);
-      box-shadow: -4px 0 12px rgba(0,0,0,0.4), 4px 0 18px rgba(0,0,0,0.3);
-    }
-    .page.active { display: block; }
-
-    /* 커피·물 얼룩 */
-    .stain {
-      position: absolute;
-      border-radius: 50%;
-      background: rgba(160,100,40,0.07);
       pointer-events: none;
+      z-index: 1;
     }
 
-    .pg-num {
-      font-family: 'Caveat', cursive;
-      font-size: 12px;
-      color: #9a7a50;
-      text-align: right;
-      margin-bottom: 10px;
-      letter-spacing: 1px;
-    }
-
-    .pg-title {
-      font-family: 'Nanum Myeongjo', serif;
-      font-size: 24px;
-      font-weight: 800;
-      color: #3a1e06;
-      text-align: center;
-      letter-spacing: 3px;
-      margin-bottom: 4px;
-    }
-
-    .pg-subtitle {
-      font-family: 'Caveat', cursive;
-      font-size: 14px;
-      color: #8a6030;
-      text-align: center;
-      margin-bottom: 12px;
-    }
-
-    .pg-divider {
-      border: none;
-      border-top: 1.5px solid #c8a060;
-      opacity: 0.5;
-      margin: 8px 0 14px;
-    }
-
-    /* 삽화 영역 */
-    .pg-illus {
-      width: 100%;
+    /* ── 책 전체 래퍼 ── */
+    /*
+      테이블 위에 책이 놓인 느낌:
+      약간 기울어지고, 그림자로 입체감
+    */
+    #book-wrapper {
+      position: fixed;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 8px 0 14px;
+      z-index: 10;
     }
 
-    .pg-illus svg { border-radius: 4px; }
-
-    .pg-body {
-      font-family: 'Gaegu', cursive;
-      font-size: 17px;
-      color: #3a2010;
-      line-height: 2;
-      margin-bottom: 10px;
-    }
-
-    .pg-note {
-      font-family: 'Caveat', cursive;
-      font-size: 15px;
-      color: #7a5020;
-      font-style: italic;
-      line-height: 1.8;
-      border-left: 3px solid #c8905a;
-      padding-left: 10px;
-      margin-top: 10px;
-    }
-
-    .pg-recipe-title {
-      font-family: 'Nanum Myeongjo', serif;
-      font-size: 13px;
-      font-weight: 700;
-      color: #5a3a10;
-      margin: 12px 0 6px;
-    }
-
-    .pg-recipe-list {
-      font-family: 'Caveat', cursive;
-      font-size: 16px;
-      color: #4a2808;
-      line-height: 2.2;
-    }
-
-    /* 고무도장 느낌 */
-    .stamp {
-      position: absolute;
-      border: 2px solid rgba(180,80,40,0.45);
-      border-radius: 4px;
-      padding: 4px 9px;
-      font-family: 'Caveat', cursive;
-      font-size: 12px;
-      color: rgba(180,80,40,0.55);
-      transform: rotate(-8deg);
-      pointer-events: none;
-      line-height: 1.5;
-      text-align: center;
-    }
-
-    /* 책 넘기기 버튼 */
-    .book-nav {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 14px;
-    }
-
-    .nav-btn {
-      background: #8a5a2a;
-      color: #f5ead6;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 4px;
-      font-family: 'Gaegu', cursive;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .nav-btn:hover { background: #6a3a10; }
-    .nav-btn:disabled { background: #c4a880; cursor: default; }
-
-    .page-counter {
-      font-family: 'Caveat', cursive;
-      font-size: 14px;
-      color: #c4a060;
-    }
-
-    /* ────────────────────────────────────────
-       장면 2: AR 카메라
-    ──────────────────────────────────────── */
-    #scene-ar { background: #111; }
-
-    /* 카메라 피드 + 오버레이 */
-    .cam-wrap {
+    #book {
       position: relative;
-      width: 100%;
-      flex: 1;
-      overflow: hidden;
-      background: #1a2a1a;
+      width: 320px;
+      height: 460px;
+      /* 살짝 기울어진 책 */
+      transform: rotate(-1.5deg);
+      /* 테이블 위 그림자 */
+      filter: drop-shadow(0 24px 40px rgba(0,0,0,0.75))
+              drop-shadow(0 8px 16px rgba(0,0,0,0.5));
     }
 
-    /* 실제 카메라 영상 */
-    #cam-video {
+    /* 3D 원근감 */
+    #book-pages {
+      position: absolute;
+      inset: 0;
+      perspective: 1400px;
+    }
+
+    /* ── 개별 페이지 ── */
+    .page {
+      position: absolute;
+      inset: 0;
+      border-radius: 2px 6px 6px 2px;
+      overflow: hidden;
+
+      transform-origin: left center;
+      transform-style: preserve-3d;
+      transition: transform 0.75s cubic-bezier(0.77, 0, 0.18, 1);
+      backface-visibility: hidden;
+
+      /* 제본 왼쪽 그림자 */
+      box-shadow:
+        inset 6px 0 18px rgba(0,0,0,0.45),
+        inset -2px 0 8px rgba(0,0,0,0.1);
+    }
+
+    /* 페이지 이미지 */
+    .page img {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
-    }
-
-    /* 카메라 없을 때 보이는 배경 */
-    #cam-fallback {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-    }
-
-    /* AR 스캔 그리드 */
-    .scan-grid {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background:
-        repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(0,200,100,0.07) 49px, rgba(0,200,100,0.07) 50px),
-        repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(0,200,100,0.07) 49px, rgba(0,200,100,0.07) 50px);
       pointer-events: none;
+      user-select: none;
+      /* 오래된 책 느낌: 약간 따뜻한 필터 */
+      filter: sepia(0.25) contrast(0.95) brightness(0.92);
     }
 
-    /* 모서리 AR 프레임 */
-    .corner { position: absolute; width: 22px; height: 22px; border-color: #00e87a; border-style: solid; }
-    .tl { top: 14px; left: 14px; border-width: 2px 0 0 2px; }
-    .tr { top: 14px; right: 14px; border-width: 2px 2px 0 0; }
-    .bl { bottom: 14px; left: 14px; border-width: 0 0 2px 2px; }
-    .br { bottom: 14px; right: 14px; border-width: 0 2px 2px 0; }
+    /* 이미지 없을 때 플레이스홀더 */
+    .placeholder {
+      width: 100%;
+      height: 100%;
+      background: #f0e0c0;
+      background-image:
+        repeating-linear-gradient(
+          0deg,
+          transparent, transparent 27px,
+          rgba(139,90,43,0.12) 27px, rgba(139,90,43,0.12) 28px
+        );
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .placeholder-n { font-size: 52px; color: rgba(100,60,20,0.2); font-family: serif; }
+    .placeholder-t { font-size: 14px; color: rgba(100,60,20,0.4); text-align: center; line-height: 1.6; font-family: serif; }
 
-    /* 구름 AR 오브젝트 */
-    #ar-cloud {
+    /* 페이지 위 질감 오버레이 */
+    .page::after {
+      content: '';
       position: absolute;
-      top: 60px;
+      inset: 0;
+      background:
+        /* 제본 왼쪽 그림자 */
+        linear-gradient(90deg,
+          rgba(0,0,0,0.22) 0%,
+          rgba(0,0,0,0.07) 10%,
+          transparent 28%
+        ),
+        /* 오른쪽 끝 살짝 어둡게 */
+        linear-gradient(270deg,
+          rgba(0,0,0,0.06) 0%,
+          transparent 15%
+        );
+      pointer-events: none;
+      z-index: 5;
+      border-radius: inherit;
+    }
+
+    /* 넘어간 페이지 */
+    .page.flipped {
+      transform: rotateY(-180deg);
+    }
+
+    /* 넘어가는 중 */
+    .page.turning {
+      box-shadow:
+        -10px 0 30px rgba(0,0,0,0.5),
+        inset 6px 0 18px rgba(0,0,0,0.3);
+    }
+
+    /* ── 책 척추(제본부) ── */
+    #book-spine {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 14px;
+      background: linear-gradient(90deg, #1a0a02, #4a2808 40%, #2a1404);
+      border-radius: 2px 0 0 2px;
+      z-index: 20;
+      box-shadow: inset -3px 0 8px rgba(0,0,0,0.4);
+    }
+
+    /* ── 책 가장자리 (쌓인 페이지) ── */
+    #book-edge-right {
+      position: absolute;
+      right: -4px; top: 3px; bottom: 3px;
+      width: 5px;
+      background: linear-gradient(90deg, #e8d8b0, #d0c090);
+      border-radius: 0 2px 2px 0;
+      z-index: 9;
+    }
+    #book-edge-bottom {
+      position: absolute;
+      bottom: -5px; left: 8px; right: 0;
+      height: 6px;
+      background: linear-gradient(180deg, #e0d0a8, #c8b888);
+      border-radius: 0 0 2px 0;
+      z-index: 9;
+    }
+
+    /* ── 터치 힌트 ── */
+    #touch-hint {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-1.5deg);
+      color: rgba(255,220,140,0.5);
+      font-size: 13px;
+      font-family: serif;
+      letter-spacing: 1px;
+      pointer-events: none;
+      z-index: 100;
+      white-space: nowrap;
+      transition: opacity 0.8s;
+    }
+
+    /* ── 페이지 번호 ── */
+    #page-num {
+      position: fixed;
+      bottom: 52px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-1.5deg);
+      color: rgba(255,200,100,0.35);
+      font-size: 12px;
+      font-family: serif;
+      letter-spacing: 2px;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* ── AR 이동 버튼 (마지막 페이지) ── */
+    #go-ar {
+      display: none;
+      position: fixed;
+      bottom: 36px;
       left: 50%;
       transform: translateX(-50%);
-      cursor: pointer;
-      z-index: 20;
-      text-align: center;
-      animation: floatCloud 3s ease-in-out infinite;
-    }
-
-    @keyframes floatCloud {
-      0%, 100% { transform: translateX(-50%) translateY(0); }
-      50%       { transform: translateX(-50%) translateY(-12px); }
-    }
-
-    .ar-tag {
-      background: rgba(0,232,122,0.92);
-      color: #003a18;
-      font-family: 'Gaegu', cursive;
-      font-size: 13px;
-      font-weight: 700;
-      padding: 3px 12px;
-      border-radius: 20px;
-      display: inline-block;
-      margin-bottom: 6px;
-      white-space: nowrap;
-    }
-
-    /* 구름 주변 맥동 링 */
-    .ar-ring {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 100px; height: 70px;
-      border: 2px solid #00e87a;
-      border-radius: 35px;
-      animation: arPulse 2s ease-out infinite;
-      pointer-events: none;
-    }
-    @keyframes arPulse {
-      0%   { opacity: 0.9; transform: translate(-50%,-50%) scale(0.85); }
-      100% { opacity: 0;   transform: translate(-50%,-50%) scale(1.6); }
-    }
-
-    .cam-hud {
-      background: #0a1a0a;
-      color: #00e87a;
-      font-family: 'Caveat', cursive;
-      font-size: 13px;
-      padding: 8px 14px;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .cam-instruction {
-      background: #0f2010;
-      color: #a0ffc0;
-      font-family: 'Gaegu', cursive;
-      font-size: 16px;
-      text-align: center;
-      padding: 14px;
-      line-height: 1.7;
-    }
-
-    /* ────────────────────────────────────────
-       장면 3: 요리 게임
-    ──────────────────────────────────────── */
-    #scene-cook { background: #2a1a0a; }
-
-    .cook-header {
-      background: #1a0e04;
-      padding: 12px 16px;
-      display: flex;
-      align-items: center;
-    }
-
-    .cook-title {
-      font-family: 'Nanum Myeongjo', serif;
-      font-size: 18px;
-      font-weight: 800;
-      color: #f0c060;
-      flex: 1;
-      text-align: center;
-    }
-
-    .back-btn {
-      background: none;
-      border: none;
-      color: #c0a060;
-      font-size: 20px;
-      cursor: pointer;
-    }
-
-    /* 단계 점 */
-    .step-bar {
-      display: flex;
-      gap: 6px;
-      justify-content: center;
-      padding: 8px;
-      background: #1a0e04;
-    }
-
-    .step-dot {
-      width: 11px; height: 11px;
-      border-radius: 50%;
-      background: #4a3020;
-      border: 1.5px solid #7a5030;
-      transition: all 0.3s;
-    }
-    .step-dot.done   { background: #d08020; border-color: #f0a030; }
-    .step-dot.active { background: #f0c060; border-color: #fff0a0; transform: scale(1.3); }
-
-    /* 요리 뷰포트 */
-    .cook-vp {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      background: #1e3010;
-      min-height: 300px;
-    }
-
-    /* 재료 아이템 */
-    .ingr {
-      position: absolute;
-      cursor: pointer;
-      text-align: center;
-      user-select: none;
-      z-index: 5;
-      transition: transform 0.15s, opacity 0.3s;
-      animation: ingrFloat 2.5s ease-in-out infinite;
-    }
-    .ingr:active { transform: scale(0.85) !important; }
-
-    @keyframes ingrFloat {
-      0%, 100% { transform: translateY(0); }
-      50%       { transform: translateY(-8px); }
-    }
-
-    .ingr-emoji { font-size: 46px; display: block; }
-    .ingr-label {
-      font-family: 'Gaegu', cursive;
-      font-size: 13px;
-      color: #f0e0a0;
-      background: rgba(0,0,0,0.6);
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-top: 2px;
-      white-space: nowrap;
-    }
-
-    /* 반짝이는 테두리 */
-    .ingr-ring {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -60%);
-      width: 58px; height: 58px;
-      border-radius: 50%;
-      border: 2px dashed rgba(255,220,100,0.7);
-      animation: ingrRing 1.5s ease-in-out infinite;
-      pointer-events: none;
-    }
-    @keyframes ingrRing {
-      0%, 100% { opacity: 0.4; transform: translate(-50%,-60%) scale(1); }
-      50%       { opacity: 0.9; transform: translate(-50%,-60%) scale(1.2); }
-    }
-
-    /* 그릇 */
-    #cook-bowl {
-      position: absolute;
-      bottom: 16px; left: 50%;
-      transform: translateX(-50%);
-      text-align: center;
-      pointer-events: none;
-      z-index: 3;
-    }
-    .bowl-emoji { font-size: 54px; }
-    .bowl-label {
-      font-family: 'Gaegu', cursive;
-      font-size: 12px;
-      color: #f0d080;
-      margin-top: 2px;
-    }
-
-    .cook-inst {
-      background: #1a0e04;
-      color: #f0c060;
-      font-family: 'Gaegu', cursive;
-      font-size: 16px;
-      text-align: center;
-      padding: 12px 16px;
-      min-height: 54px;
-      line-height: 1.6;
-    }
-
-    /* 진행바 */
-    .prog-wrap {
-      background: #0a0804;
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .prog-label {
-      font-family: 'Caveat', cursive;
-      font-size: 13px;
-      color: #c0a060;
-      white-space: nowrap;
-    }
-    .prog-bg {
-      flex: 1;
-      height: 8px;
-      background: #3a2010;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .prog-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #d08020, #f0e050);
-      border-radius: 4px;
-      width: 0%;
-      transition: width 0.4s ease;
-    }
-
-    /* ────────────────────────────────────────
-       장면 4: 엔딩
-    ──────────────────────────────────────── */
-    #scene-end {
-      background: linear-gradient(180deg, #1a3020 0%, #2a1808 100%);
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 40px 24px;
-    }
-
-    .end-bread {
-      font-size: 88px;
-      animation: floatCloud 3s ease-in-out infinite;
-      margin-bottom: 20px;
-      display: block;
-    }
-
-    .end-title {
-      font-family: 'Nanum Myeongjo', serif;
-      font-size: 28px;
-      font-weight: 800;
-      color: #f0e090;
-      letter-spacing: 3px;
-      margin-bottom: 10px;
-    }
-
-    .end-body {
-      font-family: 'Gaegu', cursive;
-      font-size: 18px;
-      color: #c0e090;
-      line-height: 2.1;
-      margin-bottom: 30px;
-    }
-
-    .end-btn {
-      background: #d08020;
-      color: #fff8e0;
-      border: none;
-      padding: 14px 36px;
+      padding: 13px 30px;
+      background: rgba(30, 80, 30, 0.92);
+      color: #c8ffb0;
+      border: 1px solid rgba(100,200,80,0.4);
       border-radius: 30px;
-      font-family: 'Gaegu', cursive;
-      font-size: 20px;
+      font-size: 18px;
+      font-family: serif;
+      letter-spacing: 1px;
       cursor: pointer;
-      transition: background 0.2s;
+      z-index: 200;
+      animation: glowPulse 2.5s ease-in-out infinite;
+      white-space: nowrap;
     }
-    .end-btn:hover { background: #b06010; }
+    @keyframes glowPulse {
+      0%,100% { box-shadow: 0 0 12px rgba(60,180,60,0.3); }
+      50%      { box-shadow: 0 0 28px rgba(60,180,60,0.65); }
+    }
+
+    /* ── 좌우 터치 영역 (투명) ── */
+    #tap-left, #tap-right {
+      position: fixed;
+      top: 0; bottom: 0;
+      width: 50%;
+      z-index: 50;
+      cursor: pointer;
+    }
+    #tap-left  { left: 0; }
+    #tap-right { right: 0; }
   </style>
 </head>
 <body>
 
-<!-- ════════════════════════════════
-     장면 1: 레시피북
-════════════════════════════════ -->
-<div id="scene-book" class="scene active">
-  <div class="book-wrap">
+<!-- 나무 테이블 배경 -->
+<div id="table-bg"></div>
+<div id="table-light"></div>
 
-    <!-- 표지 -->
-    <div class="page active" id="pg-0">
-      <div class="stain" style="width:80px;height:60px;top:28px;right:18px;"></div>
-      <div class="stain" style="width:50px;height:38px;bottom:60px;left:28px;"></div>
-      <div style="text-align:center;margin-top:30px;">
-        <div style="font-family:'Caveat',cursive;font-size:13px;color:#9a7a50;letter-spacing:3px;margin-bottom:8px;">RECIPE BOOK ST.</div>
-        <div style="border-top:2px solid #b8895a;border-bottom:2px solid #b8895a;padding:14px 0;margin:0 16px;">
-          <div class="pg-title" style="font-size:34px;letter-spacing:5px;">구름빵</div>
-          <div class="pg-subtitle">Cloud Bread</div>
+<!-- 터치 영역 -->
+<div id="tap-left"  onclick="prevPage()"></div>
+<div id="tap-right" onclick="nextPage()"></div>
+
+<!-- ══ 책 ══ -->
+<div id="book-wrapper">
+  <div id="book">
+    <!-- 페이지 렌더링 영역 -->
+    <div id="book-pages">
+
+      <!--
+      ╔══════════════════════════════════════╗
+      ║  페이지 추가/교체 방법               ║
+      ║                                      ║
+      ║  각 .page 안의 img src를             ║
+      ║  본인 이미지 파일명으로 교체하세요   ║
+      ║                                      ║
+      ║  페이지 추가: 아래 블록 복사 후      ║
+      ║  id="pg-5", src="page5.jpg" 변경    ║
+      ║  JS의 TOTAL_PAGES 숫자도 변경!      ║
+      ╚══════════════════════════════════════╝
+      -->
+
+      <!-- 페이지 0: 표지 -->
+      <div class="page" id="pg-0">
+        <img src="page0.jpg" alt="표지"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div class="placeholder" style="display:none;">
+          <div class="placeholder-n">📖</div>
+          <div class="placeholder-t">표지<br>page0.jpg</div>
         </div>
-        <div style="margin:20px auto;width:70px;height:1px;background:#b8895a;opacity:0.4;"></div>
-        <!-- 구름빵 삽화 -->
-        <svg width="160" height="110" viewBox="0 0 160 110" style="display:block;margin:0 auto;">
-          <ellipse cx="80" cy="82" rx="36" ry="18" fill="#8a6030" opacity="0.75"/>
-          <ellipse cx="58" cy="68" rx="19" ry="17" fill="#d4c4a0" opacity="0.9"/>
-          <ellipse cx="80" cy="60" rx="23" ry="19" fill="#e8dfc0"/>
-          <ellipse cx="102" cy="66" rx="21" ry="18" fill="#ddd4b0" opacity="0.9"/>
-          <ellipse cx="80" cy="53" rx="18" ry="15" fill="#f0e8d0"/>
-          <ellipse cx="66" cy="49" rx="13" ry="11" fill="#f4f0e4" opacity="0.8"/>
-          <ellipse cx="94" cy="47" rx="14" ry="12" fill="#f4f0e4" opacity="0.8"/>
-          <text x="80" y="102" text-anchor="middle" font-family="Caveat,cursive" font-size="12" fill="#6a4020" opacity="0.7">폭신폭신~</text>
-        </svg>
-        <div style="margin-top:18px;font-family:'Caveat',cursive;font-size:13px;color:#8a6a40;line-height:1.9;">
-          글·그림 백희나<br>아람출판사
+      </div>
+
+      <!-- 페이지 1 -->
+      <div class="page" id="pg-1">
+        <img src="page1.jpg" alt="1페이지"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div class="placeholder" style="display:none;">
+          <div class="placeholder-n">1</div>
+          <div class="placeholder-t">1페이지<br>page1.jpg</div>
         </div>
       </div>
-      <div class="stamp" style="bottom:36px;right:18px;">1st<br>Edition</div>
-    </div>
 
-    <!-- p.1 비 오는 아침 -->
-    <div class="page" id="pg-1">
-      <div class="stain" style="width:60px;height:46px;top:48px;right:10px;opacity:0.6;"></div>
-      <div class="pg-num">— p. 1 —</div>
-      <div class="pg-title">비 오는 아침</div>
-      <hr class="pg-divider">
-      <div class="pg-illus">
-        <svg width="220" height="140" viewBox="0 0 220 140">
-          <rect width="220" height="140" rx="4" fill="#c8d8f0"/>
-          <rect x="0" y="85" width="220" height="55" fill="#8a7050"/>
-          <rect x="35" y="28" width="150" height="90" rx="2" fill="#e8d8c0"/>
-          <rect x="55" y="48" width="42" height="38" rx="1" fill="#a0c8f0"/>
-          <rect x="110" y="48" width="42" height="38" rx="1" fill="#a0c8f0"/>
-          <line x1="76" y1="48" x2="76" y2="86" stroke="#88aacc" stroke-width="1"/>
-          <line x1="55" y1="67" x2="97" y2="67" stroke="#88aacc" stroke-width="1"/>
-          <!-- 구름 -->
-          <ellipse cx="110" cy="16" rx="24" ry="14" fill="white" opacity="0.9"/>
-          <ellipse cx="94" cy="19" rx="17" ry="13" fill="white" opacity="0.85"/>
-          <ellipse cx="126" cy="18" rx="19" ry="13" fill="white" opacity="0.85"/>
-          <!-- 빗방울 -->
-          <line x1="80" y1="33" x2="78" y2="43" stroke="#7090b0" stroke-width="1.3" stroke-linecap="round"/>
-          <line x1="92" y1="30" x2="90" y2="40" stroke="#7090b0" stroke-width="1.3" stroke-linecap="round"/>
-          <line x1="104" y1="31" x2="102" y2="41" stroke="#7090b0" stroke-width="1.3" stroke-linecap="round"/>
-          <line x1="116" y1="30" x2="114" y2="40" stroke="#7090b0" stroke-width="1.3" stroke-linecap="round"/>
-          <line x1="128" y1="31" x2="126" y2="41" stroke="#7090b0" stroke-width="1.3" stroke-linecap="round"/>
-          <!-- 창문 속 아이들 -->
-          <circle cx="66" cy="65" r="6" fill="#d09060"/>
-          <circle cx="122" cy="65" r="6" fill="#d08060"/>
-          <!-- 나무 -->
-          <rect x="26" y="110" width="14" height="30" rx="2" fill="#7a4a20"/>
-          <ellipse cx="33" cy="100" rx="20" ry="22" fill="#4a7030"/>
-          <ellipse cx="33" cy="90" rx="14" ry="16" fill="#5a8040"/>
-        </svg>
-      </div>
-      <div class="pg-body">
-        비가 내리는 어느 날 아침,<br>
-        홍비와 홍시는 창문 너머로<br>
-        이상한 걸 발견했어요.
-      </div>
-      <div class="pg-note">나무에... 뭔가 하얗고<br>폭신폭신한 게 걸려있어!</div>
-    </div>
-
-    <!-- p.2 구름 발견 -->
-    <div class="page" id="pg-2">
-      <div class="stain" style="width:70px;height:54px;bottom:44px;right:14px;opacity:0.5;"></div>
-      <div class="pg-num">— p. 2 —</div>
-      <div class="pg-title">구름 발견!</div>
-      <hr class="pg-divider">
-      <div class="pg-illus">
-        <svg width="220" height="140" viewBox="0 0 220 140">
-          <rect width="220" height="140" rx="4" fill="#d8eac8"/>
-          <rect x="0" y="95" width="220" height="45" fill="#6a8040"/>
-          <!-- 나무 -->
-          <rect x="87" y="44" width="18" height="58" rx="3" fill="#7a5030"/>
-          <ellipse cx="96" cy="38" rx="32" ry="28" fill="#4a7020"/>
-          <ellipse cx="96" cy="30" rx="24" ry="21" fill="#5a8030"/>
-          <ellipse cx="96" cy="22" rx="17" ry="15" fill="#6a9040"/>
-          <!-- 나무에 걸린 구름 -->
-          <ellipse cx="128" cy="32" rx="19" ry="15" fill="white" opacity="0.93"/>
-          <ellipse cx="140" cy="26" rx="15" ry="13" fill="white" opacity="0.9"/>
-          <ellipse cx="148" cy="32" rx="17" ry="14" fill="white" opacity="0.88"/>
-          <ellipse cx="138" cy="38" rx="21" ry="14" fill="white" opacity="0.85"/>
-          <text x="138" y="44" text-anchor="middle" font-family="Caveat,cursive" font-size="11" fill="#6080a0">구름~</text>
-          <!-- 아이들 -->
-          <ellipse cx="38" cy="110" rx="11" ry="15" fill="#c8804a"/>
-          <ellipse cx="38" cy="97" rx="8" ry="9" fill="#d8906a"/>
-          <line x1="28" y1="107" x2="20" y2="118" stroke="#c8804a" stroke-width="3.5" stroke-linecap="round"/>
-          <line x1="48" y1="107" x2="56" y2="118" stroke="#c8804a" stroke-width="3.5" stroke-linecap="round"/>
-          <line x1="38" y1="97" x2="54" y2="86" stroke="#c8804a" stroke-width="2.5" stroke-linecap="round"/>
-          <ellipse cx="168" cy="110" rx="11" ry="15" fill="#c86050"/>
-          <ellipse cx="168" cy="97" rx="8" ry="9" fill="#d87070"/>
-          <line x1="158" y1="107" x2="150" y2="118" stroke="#c86050" stroke-width="3.5" stroke-linecap="round"/>
-          <line x1="178" y1="107" x2="186" y2="118" stroke="#c86050" stroke-width="3.5" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <div class="pg-body">
-        홍비와 홍시는 빈터로<br>
-        달려 나갔어요!<br>
-        나무에 구름이 걸려있었어요.
-      </div>
-      <div class="pg-note">신발도 제대로 못 신고<br>뛰어나간 거예요~</div>
-    </div>
-
-    <!-- p.3 엄마에게 -->
-    <div class="page" id="pg-3">
-      <div class="stain" style="width:55px;height:44px;top:58px;left:8px;opacity:0.5;"></div>
-      <div class="pg-num">— p. 3 —</div>
-      <div class="pg-title">엄마에게!</div>
-      <hr class="pg-divider">
-      <div class="pg-illus">
-        <svg width="220" height="140" viewBox="0 0 220 140">
-          <rect width="220" height="140" rx="4" fill="#f0e8d0"/>
-          <rect x="0" y="95" width="220" height="45" fill="#c8a870"/>
-          <!-- 집 -->
-          <rect x="65" y="42" width="90" height="72" rx="4" fill="#e8d0a0"/>
-          <polygon points="65,42 110,15 155,42" fill="#c09060"/>
-          <!-- 창문 -->
-          <rect x="80" y="55" width="28" height="26" rx="2" fill="#a0c0d8"/>
-          <rect x="112" y="55" width="28" height="26" rx="2" fill="#a0c0d8"/>
-          <!-- 문 -->
-          <rect x="93" y="84" width="34" height="30" rx="2" fill="#b07840"/>
-          <circle cx="120" cy="99" r="3" fill="#8a5820"/>
-          <!-- 아이 -->
-          <ellipse cx="155" cy="108" rx="11" ry="15" fill="#e0a060"/>
-          <ellipse cx="155" cy="96" rx="8" ry="9" fill="#f0b870"/>
-          <line x1="145" y1="105" x2="136" y2="116" stroke="#e0a060" stroke-width="3.5" stroke-linecap="round"/>
-          <line x1="165" y1="105" x2="174" y2="116" stroke="#e0a060" stroke-width="3.5" stroke-linecap="round"/>
-          <!-- 구름 들고 있음 -->
-          <line x1="155" y1="96" x2="170" y2="82" stroke="#e0a060" stroke-width="2.5" stroke-linecap="round"/>
-          <ellipse cx="178" cy="76" rx="13" ry="9" fill="white" opacity="0.9"/>
-          <ellipse cx="170" cy="71" rx="10" ry="9" fill="white" opacity="0.88"/>
-          <ellipse cx="184" cy="71" rx="11" ry="9" fill="white" opacity="0.85"/>
-          <text x="177" y="74" text-anchor="middle" font-family="Caveat,cursive" font-size="10" fill="#6080a0">구름!</text>
-        </svg>
-      </div>
-      <div class="pg-body">
-        엄마한테 달려가서<br>
-        구름을 보여줬어요.
-      </div>
-      <div class="pg-note">
-        "엄마! 이게 뭔지 알아?"<br>
-        "어머, 구름이잖아! 이걸로<br>
-        빵을 만들어볼까?"
-      </div>
-    </div>
-
-    <!-- p.4 레시피 페이지 -->
-    <div class="page" id="pg-4">
-      <div class="stain" style="width:65px;height:50px;top:38px;right:14px;opacity:0.6;"></div>
-      <div class="pg-num">— p. 4 —</div>
-      <div class="pg-title">구름빵 레시피</div>
-      <hr class="pg-divider">
-
-      <div class="pg-recipe-title">[ 재료 ]</div>
-      <div class="pg-recipe-list">
-        ✦ 구름 한 뭉치<br>
-        ✦ 봄 향기 나는 제철 재료<br>
-        ✦ 따뜻한 마음<br>
-        ✦ 수분 조금<br>
-        ✦ 엄마의 손
+      <!-- 페이지 2 -->
+      <div class="page" id="pg-2">
+        <img src="page2.jpg" alt="2페이지"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div class="placeholder" style="display:none;">
+          <div class="placeholder-n">2</div>
+          <div class="placeholder-t">2페이지<br>page2.jpg</div>
+        </div>
       </div>
 
-      <div class="pg-recipe-title" style="margin-top:16px;">[ 만드는 법 ]</div>
-      <div class="pg-recipe-list">
-        1. 나무에서 구름을 따세요<br>
-        2. 재료를 조물조물 반죽<br>
-        3. 제철 재료를 넣어요<br>
-        4. 오븐에 넣고 굽기<br>
-        5. 완성! 먹으면 둥실~ ☁
+      <!-- 페이지 3 -->
+      <div class="page" id="pg-3">
+        <img src="page3.jpg" alt="3페이지"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div class="placeholder" style="display:none;">
+          <div class="placeholder-n">3</div>
+          <div class="placeholder-t">3페이지<br>page3.jpg</div>
+        </div>
       </div>
 
-      <div style="margin-top:16px;font-family:'Caveat',cursive;font-size:14px;color:#7a5020;font-style:italic;text-align:center;">
-        — 자, 이제 직접 만들어볼까요? —
+      <!-- 페이지 4: 마지막 -->
+      <div class="page" id="pg-4">
+        <img src="page4.jpg" alt="마지막 페이지"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div class="placeholder" style="display:none;">
+          <div class="placeholder-n">4</div>
+          <div class="placeholder-t">마지막 페이지<br>page4.jpg</div>
+        </div>
       </div>
-      <div class="stamp" style="bottom:28px;right:16px;font-size:14px;padding:6px 12px;">
-        구름빵<br>완성!
-      </div>
-    </div>
 
-  </div><!-- /book-wrap -->
+    </div><!-- /book-pages -->
 
-  <!-- 페이지 넘기기 버튼 -->
-  <div class="book-nav" style="padding:0 16px;margin-top:14px;margin-bottom:20px;">
-    <button class="nav-btn" id="btn-prev" onclick="prevPage()" disabled>◀ 이전</button>
-    <div class="page-counter" id="pg-counter">1 / 5</div>
-    <button class="nav-btn" id="btn-next" onclick="nextPage()">다음 ▶</button>
+    <!-- 책 장식 -->
+    <div id="book-spine"></div>
+    <div id="book-edge-right"></div>
+    <div id="book-edge-bottom"></div>
   </div>
 </div>
 
+<!-- UI -->
+<div id="page-num">1 / 5</div>
+<div id="touch-hint">화면을 터치해서 넘기세요</div>
+<button id="go-ar" onclick="goToAR()">☁ 구름 따러 가기</button>
 
-<!-- ════════════════════════════════
-     장면 2: AR 카메라
-════════════════════════════════ -->
-<div id="scene-ar" class="scene">
-
-  <!-- 카메라 뷰포트 -->
-  <div class="cam-wrap" style="min-height:440px;">
-    <!-- 실제 카메라 영상 (권한 허용 시) -->
-    <video id="cam-video" autoplay playsinline muted style="display:none;"></video>
-
-    <!-- 카메라 없을 때 배경 -->
-    <svg id="cam-fallback" width="100%" height="100%" viewBox="0 0 370 440" preserveAspectRatio="xMidYMid slice">
-      <rect width="370" height="440" fill="#1e3518"/>
-      <rect x="0" y="290" width="370" height="150" fill="#3a5020"/>
-      <rect x="0" y="310" width="370" height="130" fill="#4a6028"/>
-      <!-- 나무 -->
-      <rect x="157" y="195" width="26" height="120" rx="4" fill="#7a4a20"/>
-      <ellipse cx="170" cy="155" rx="68" ry="60" fill="#3a6018"/>
-      <ellipse cx="170" cy="138" rx="54" ry="48" fill="#4a7020"/>
-      <ellipse cx="158" cy="122" rx="40" ry="36" fill="#5a8028"/>
-      <ellipse cx="178" cy="110" rx="32" ry="30" fill="#6a9030"/>
-      <!-- 작은 나무들 -->
-      <rect x="22" y="258" width="16" height="54" rx="3" fill="#8a5520"/>
-      <ellipse cx="30" cy="238" rx="28" ry="25" fill="#3a5818"/>
-      <ellipse cx="30" cy="226" rx="20" ry="18" fill="#4a6820"/>
-      <rect x="302" y="265" width="15" height="47" rx="3" fill="#8a5520"/>
-      <ellipse cx="309" cy="247" rx="26" ry="23" fill="#3a5818"/>
-      <ellipse cx="309" cy="235" rx="18" ry="16" fill="#4a6820"/>
-      <!-- 풀 -->
-      <rect x="0" y="305" width="370" height="3" rx="1" fill="#2a4010" opacity="0.4"/>
-    </svg>
-
-    <!-- AR 오버레이 요소들 -->
-    <div class="scan-grid"></div>
-    <div class="corner tl"></div>
-    <div class="corner tr"></div>
-    <div class="corner bl"></div>
-    <div class="corner br"></div>
-
-    <!-- 구름 AR 오브젝트 -->
-    <div id="ar-cloud" onclick="catchCloud()">
-      <div class="ar-ring"></div>
-      <div class="ar-tag">☁ 터치해서 구름 따기!</div>
-      <svg width="90" height="62" viewBox="0 0 90 62">
-        <ellipse cx="45" cy="40" rx="36" ry="20" fill="rgba(220,235,255,0.88)" stroke="#80b8e8" stroke-width="1.5"/>
-        <ellipse cx="28" cy="34" rx="18" ry="16" fill="rgba(230,242,255,0.92)" stroke="#80b8e8" stroke-width="1.5"/>
-        <ellipse cx="60" cy="31" rx="20" ry="17" fill="rgba(228,240,255,0.90)" stroke="#80b8e8" stroke-width="1.5"/>
-        <ellipse cx="44" cy="24" rx="16" ry="14" fill="rgba(242,250,255,0.95)" stroke="#a0c8f0" stroke-width="1"/>
-      </svg>
-    </div>
-  </div>
-
-  <div class="cam-hud">
-    <span>● REC</span>
-    <span>AR MODE · GPS ON</span>
-    <span id="ar-status">구름 감지 중...</span>
-  </div>
-
-  <div class="cam-instruction">
-    비 오는 날 나무에 구름이 걸려있어요!<br>
-    <span style="color:#00ff80;font-weight:700;">구름을 터치해서 따보세요~ ☁</span>
-  </div>
-</div>
-
-
-<!-- ════════════════════════════════
-     장면 3: 요리 게임
-════════════════════════════════ -->
-<div id="scene-cook" class="scene">
-  <div class="cook-header">
-    <button class="back-btn" onclick="goTo('scene-ar')">←</button>
-    <div class="cook-title">구름빵 만들기</div>
-  </div>
-
-  <div class="step-bar" id="step-bar"></div>
-
-  <div class="cook-vp" id="cook-vp">
-    <!-- 주방 배경 SVG -->
-    <svg style="position:absolute;top:0;left:0;width:100%;height:100%;" viewBox="0 0 370 320" preserveAspectRatio="xMidYMid slice">
-      <rect width="370" height="320" fill="#1a2c10"/>
-      <rect x="0" y="175" width="370" height="145" fill="#3a2808"/>
-      <rect x="35" y="135" width="300" height="120" rx="6" fill="#c89060"/>
-      <rect x="25" y="248" width="320" height="14" rx="4" fill="#a07040"/>
-      <!-- 냄비/그릇 자리 -->
-      <ellipse cx="120" cy="232" rx="42" ry="21" fill="#9a7848"/>
-      <ellipse cx="250" cy="232" rx="42" ry="21" fill="#9a7848"/>
-      <!-- 오븐 -->
-      <rect x="138" y="48" width="94" height="60" rx="8" fill="#c8a870"/>
-      <rect x="150" y="58" width="70" height="42" rx="4" fill="#6888a8"/>
-      <circle cx="218" cy="118" r="4" fill="#c84040"/>
-      <circle cx="232" cy="118" r="4" fill="#404040"/>
-    </svg>
-
-    <!-- 재료들 (JS로 동적 생성) -->
-    <div id="ingr-area"></div>
-
-    <!-- 그릇 -->
-    <div id="cook-bowl">
-      <div class="bowl-emoji" id="bowl-emoji">🥣</div>
-      <div class="bowl-label" id="bowl-label">반죽 그릇</div>
-    </div>
-  </div>
-
-  <div class="cook-inst" id="cook-inst">재료를 터치해서 반죽에 넣어요!</div>
-
-  <div class="prog-wrap">
-    <div class="prog-label" id="prog-label">0 / 0</div>
-    <div class="prog-bg">
-      <div class="prog-fill" id="prog-fill"></div>
-    </div>
-  </div>
-</div>
-
-
-<!-- ════════════════════════════════
-     장면 4: 엔딩
-════════════════════════════════ -->
-<div id="scene-end" class="scene">
-  <span class="end-bread">🍞</span>
-  <div class="end-title">구름빵 완성!</div>
-  <div class="end-body">
-    폭신폭신 구름빵을 먹으면<br>
-    몸이 가벼워져서<br>
-    하늘을 둥실 날 수 있어요!<br><br>
-    <span style="font-size:15px;color:#f0e080;font-family:'Nanum Myeongjo',serif;font-weight:700;">글·그림 백희나</span>
-  </div>
-  <button class="end-btn" onclick="restart()">🔄 처음부터 다시</button>
-</div>
-
-
-<!-- ════════════════════════════════
-     JavaScript
-════════════════════════════════ -->
 <script>
-  /* ── 레시피북 변수 ── */
-  let curPage = 0;
+  // ★ 페이지 수 (페이지 div 개수와 맞추기)
   const TOTAL_PAGES = 5;
 
-  function prevPage() {
-    if (curPage === 0) return;
-    document.getElementById('pg-' + curPage).classList.remove('active');
-    curPage--;
-    document.getElementById('pg-' + curPage).classList.add('active');
-    updateBookNav();
+  let cur = 0;
+  let turning = false;
+
+  // 시작: z-index 설정 (앞 페이지가 위에)
+  function init() {
+    for (let i = 0; i < TOTAL_PAGES; i++) {
+      const pg = document.getElementById('pg-' + i);
+      pg.style.zIndex = TOTAL_PAGES - i;
+    }
+    updateUI();
   }
 
+  // 다음 페이지 (오른쪽 터치)
   function nextPage() {
-    if (curPage < TOTAL_PAGES - 1) {
-      document.getElementById('pg-' + curPage).classList.remove('active');
-      curPage++;
-      document.getElementById('pg-' + curPage).classList.add('active');
-      updateBookNav();
+    if (turning || cur >= TOTAL_PAGES - 1) return;
+    const pg = document.getElementById('pg-' + cur);
+    turning = true;
+    pg.classList.add('turning');
+    setTimeout(() => {
+      pg.classList.add('flipped');
+      pg.style.zIndex = 0;
+    }, 30);
+    setTimeout(() => {
+      pg.classList.remove('turning');
+      turning = false;
+      cur++;
+      updateUI();
+    }, 780);
+  }
+
+  // 이전 페이지 (왼쪽 터치)
+  function prevPage() {
+    if (turning || cur <= 0) return;
+    const pg = document.getElementById('pg-' + (cur - 1));
+    turning = true;
+    pg.style.zIndex = TOTAL_PAGES - (cur - 1);
+    pg.classList.add('turning');
+    setTimeout(() => {
+      pg.classList.remove('flipped');
+    }, 30);
+    setTimeout(() => {
+      pg.classList.remove('turning');
+      turning = false;
+      cur--;
+      updateUI();
+    }, 780);
+  }
+
+  function updateUI() {
+    // 페이지 번호
+    document.getElementById('page-num').textContent = (cur + 1) + ' / ' + TOTAL_PAGES;
+
+    // 힌트: 3번 넘기면 사라짐
+    if (cur >= 2) document.getElementById('touch-hint').style.opacity = '0';
+
+    // 마지막 페이지: AR 버튼 / 힌트 교체
+    const goAR = document.getElementById('go-ar');
+    const hint = document.getElementById('touch-hint');
+    const pageNum = document.getElementById('page-num');
+    if (cur === TOTAL_PAGES - 1) {
+      goAR.style.display = 'block';
+      pageNum.style.opacity = '0';
     } else {
-      /* 레시피 다 읽으면 AR 장면으로 이동 */
-      startAR();
+      goAR.style.display = 'none';
+      pageNum.style.opacity = '1';
     }
   }
 
-  function updateBookNav() {
-    document.getElementById('btn-prev').disabled = (curPage === 0);
-    const nxt = document.getElementById('btn-next');
-    if (curPage === TOTAL_PAGES - 1) {
-      nxt.textContent = 'AR로 구름 따러! ☁';
-      nxt.style.background = '#3a7030';
-    } else {
-      nxt.textContent = '다음 ▶';
-      nxt.style.background = '#8a5a2a';
-    }
-    document.getElementById('pg-counter').textContent = (curPage + 1) + ' / ' + TOTAL_PAGES;
-  }
-
-
-  /* ── 장면 전환 ── */
-  function goTo(sceneId) {
-    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
-    document.getElementById(sceneId).classList.add('active');
-  }
-
-
-  /* ── AR 카메라 장면 ── */
-  function startAR() {
-    /* 레시피북을 다 읽으면 ar.html로 이동 */
+  function goToAR() {
     window.location.href = 'ar.html';
   }
 
-  /* catchCloud는 ar.html에서 처리됨 */
+  // 스와이프 지원 (터치 드래그)
+  let touchStartX = 0;
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) < 20) return; // 너무 짧은 스와이프 무시
+    if (dx < 0) nextPage();  // 왼쪽 스와이프 = 다음
+    else        prevPage();  // 오른쪽 스와이프 = 이전
+  }, { passive: true });
 
-
-  /* ── 요리 게임 ── */
-
-  /*
-   * 단계별 데이터
-   * items: 화면에 뜨는 재료 목록
-   * need:  모두 터치해야 통과
-   * bowl:  그릇 이모지 변화
-   */
-  const COOK_STEPS = [
-    {
-      inst: '구름을 조물조물 반죽해요! ☁',
-      bowl: '🥣', bowlLabel: '반죽 그릇',
-      items: [
-        { emoji: '☁', label: '구름 반죽',  x: 50,  y: 40 },
-        { emoji: '💧', label: '수분',       x: 220, y: 70 },
-        { emoji: '🌸', label: '봄 향기',    x: 135, y: 20 },
-      ]
-    },
-    {
-      inst: '제철 재료를 넣어요!',
-      bowl: '🥣', bowlLabel: '반죽 중...',
-      items: [
-        { emoji: '🥚', label: '달걀',   x: 45,  y: 55 },
-        { emoji: '🌾', label: '밀가루', x: 210, y: 38 },
-        { emoji: '🍯', label: '꿀',     x: 128, y: 25 },
-        { emoji: '🧈', label: '버터',   x: 255, y: 75 },
-      ]
-    },
-    {
-      inst: '오븐에 넣고 기다려요! 🔥',
-      bowl: '🫙', bowlLabel: '반죽 완성!',
-      items: [
-        { emoji: '🔥', label: '불 켜기',   x: 75,  y: 48 },
-        { emoji: '⏱',  label: '기다리기', x: 210, y: 58 },
-      ]
-    },
-    {
-      inst: '구름빵을 꺼내요! 🍞',
-      bowl: '🧤', bowlLabel: '오븐 장갑',
-      items: [
-        { emoji: '🍞', label: '구름빵!', x: 140, y: 40 },
-      ]
-    },
-  ];
-
-  let cookStep = 0;
-  let collected = 0;
-
-  function initCookGame() {
-    cookStep = 0;
-    renderCookStep();
-  }
-
-  function renderCookStep() {
-    const step = COOK_STEPS[cookStep];
-    collected = 0;
-
-    /* 단계 점 업데이트 */
-    const bar = document.getElementById('step-bar');
-    bar.innerHTML = '';
-    COOK_STEPS.forEach((_, i) => {
-      const dot = document.createElement('div');
-      dot.className = 'step-dot' +
-        (i < cookStep ? ' done' : i === cookStep ? ' active' : '');
-      bar.appendChild(dot);
-    });
-
-    /* 안내 문구 & 그릇 */
-    document.getElementById('cook-inst').textContent = step.inst;
-    document.getElementById('bowl-emoji').textContent = step.bowl;
-    document.getElementById('bowl-label').textContent = step.bowlLabel;
-
-    /* 진행바 */
-    updateProgress(0, step.items.length);
-
-    /* 재료 배치 */
-    const area = document.getElementById('ingr-area');
-    area.innerHTML = '';
-    step.items.forEach((item, i) => {
-      const div = document.createElement('div');
-      div.className = 'ingr';
-      div.id = 'ingr-' + i;
-      div.style.left = item.x + 'px';
-      div.style.top  = item.y + 'px';
-      div.style.animationDelay = (i * 0.45) + 's';
-      div.innerHTML = `
-        <div class="ingr-ring"></div>
-        <span class="ingr-emoji">${item.emoji}</span>
-        <div class="ingr-label">${item.label}</div>
-      `;
-      div.addEventListener('click', () => collectIngr(div, step.items.length));
-      area.appendChild(div);
-    });
-  }
-
-  function collectIngr(el, need) {
-    /* 이미 수집됐으면 무시 */
-    if (el.style.pointerEvents === 'none') return;
-
-    el.style.pointerEvents = 'none';
-    el.style.transform = 'scale(0)';
-    el.style.opacity = '0';
-
-    collected++;
-    updateProgress(collected, need);
-
-    if (collected >= need) {
-      setTimeout(() => {
-        cookStep++;
-        if (cookStep >= COOK_STEPS.length) {
-          goTo('scene-end');
-        } else {
-          renderCookStep();
-        }
-      }, 600);
-    }
-  }
-
-  function updateProgress(cur, total) {
-    document.getElementById('prog-label').textContent = cur + ' / ' + total;
-    document.getElementById('prog-fill').style.width = (total > 0 ? (cur / total * 100) : 0) + '%';
-  }
-
-
-  /* ── 페이지 로드 시 처리 ── */
-  window.addEventListener('load', function() {
-    // ar.html에서 구름 따고 넘어온 경우
-    if (window.location.hash === '#game' || sessionStorage.getItem('cloud_caught') === 'true') {
-      sessionStorage.removeItem('cloud_caught');
-      initCookGame();
-      goTo('scene-cook');
-    }
-  });
-
-  /* ── 다시 시작 ── */
-  function restart() {
-    /* 레시피북 초기화 */
-    curPage = 0;
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById('pg-0').classList.add('active');
-    updateBookNav();
-
-    goTo('scene-book');
-  }
+  init();
 </script>
-
 </body>
 </html>
