@@ -6,28 +6,59 @@
   <title>구름빵</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #1a0f05; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0704; }
 
-    /* 나무 테이블 배경 */
-    #table-bg {
-      position: fixed; inset: 0;
-      background:
-        repeating-linear-gradient(88deg, transparent 0px, transparent 38px, rgba(0,0,0,0.04) 38px, rgba(0,0,0,0.04) 40px),
-        repeating-linear-gradient(180deg, transparent 0px, transparent 90px, rgba(255,255,255,0.015) 90px, rgba(255,255,255,0.015) 92px),
-        linear-gradient(160deg, #3d2008 0%, #2a1505 40%, #1e0f03 100%);
-      z-index: 0;
-    }
-    #table-light {
-      position: fixed; inset: 0;
-      background: radial-gradient(ellipse 70% 60% at 50% 30%, rgba(255,210,120,0.13) 0%, transparent 70%);
-      pointer-events: none; z-index: 1;
+    /* 메인 캔버스 — 배경 + 촛불 빛 오버레이 */
+    #bg-canvas {
+      position: fixed; inset: 0; z-index: 0;
+      width: 100%; height: 100%;
     }
 
-    /* 캔버스 */
-    #book-canvas {
-      position: fixed; inset: 0;
-      z-index: 10;
-      touch-action: none;
+    /* 책 넘기기 캔버스 — 페이지 플립 */
+    #flip-canvas {
+      position: fixed; inset: 0; z-index: 10;
+      width: 100%; height: 100%;
+      pointer-events: none; /* 터치는 아래서 처리 */
+    }
+
+    /* 터치 캐처 */
+    #touch-layer {
+      position: fixed; inset: 0; z-index: 20;
+      cursor: pointer;
+    }
+
+    /* 인트로: 표지 이미지 (메인이미지1) */
+    #intro {
+      position: fixed; inset: 0; z-index: 30;
+      overflow: hidden;
+    }
+    #intro img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+    }
+    /* 인트로 탭 힌트 */
+    #intro-hint {
+      position: absolute;
+      bottom: 36px; left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,220,140,0.7);
+      font-size: 15px; font-family: serif; letter-spacing: 2px;
+      animation: hintPulse 2s ease-in-out infinite;
+      white-space: nowrap;
+      text-shadow: 0 0 12px rgba(255,180,60,0.8);
+    }
+    @keyframes hintPulse {
+      0%,100% { opacity: 0.5; } 50% { opacity: 1; }
+    }
+
+    /* 인트로 → 책 열기 전환 오버레이 */
+    #open-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 35;
+      background: #0a0704;
+      opacity: 0;
     }
 
     /* AR 버튼 */
@@ -36,433 +67,450 @@
       position: fixed; bottom: 36px; left: 50%;
       transform: translateX(-50%);
       padding: 13px 30px;
-      background: rgba(30,80,30,0.92);
+      background: rgba(20,60,20,0.92);
       color: #c8ffb0;
-      border: 1px solid rgba(100,200,80,0.4);
+      border: 1px solid rgba(100,200,80,0.5);
       border-radius: 30px;
       font-size: 18px; font-family: serif; letter-spacing: 1px;
       cursor: pointer; z-index: 200;
-      animation: glowPulse 2.5s ease-in-out infinite;
       white-space: nowrap;
+      text-shadow: 0 0 8px rgba(100,255,80,0.4);
+      animation: arGlow 2.5s ease-in-out infinite;
     }
-    @keyframes glowPulse {
-      0%,100% { box-shadow: 0 0 12px rgba(60,180,60,0.3); }
-      50%      { box-shadow: 0 0 28px rgba(60,180,60,0.65); }
+    @keyframes arGlow {
+      0%,100% { box-shadow: 0 0 14px rgba(60,180,60,0.35); }
+      50%      { box-shadow: 0 0 30px rgba(60,180,60,0.7); }
     }
 
-    /* 힌트 */
-    #hint {
-      position: fixed; bottom: 28px; left: 50%;
+    /* 페이지 번호 */
+    #page-num {
+      position: fixed; bottom: 16px; left: 50%;
       transform: translateX(-50%);
-      color: rgba(255,220,140,0.45);
-      font-size: 13px; font-family: serif; letter-spacing: 1px;
+      color: rgba(255,200,100,0.3);
+      font-size: 12px; font-family: serif; letter-spacing: 2px;
       pointer-events: none; z-index: 100;
-      transition: opacity 1s;
+      transition: opacity 0.5s;
     }
   </style>
 </head>
 <body>
-<div id="table-bg"></div>
-<div id="table-light"></div>
-<canvas id="book-canvas"></canvas>
+
+<!-- 배경 + 촛불 빛 레이어 -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- 페이지 플립 레이어 -->
+<canvas id="flip-canvas"></canvas>
+
+<!-- 터치 레이어 -->
+<div id="touch-layer"></div>
+
+<!-- 인트로 (표지) -->
+<div id="intro">
+  <!-- ★ 표지 이미지: 메인이미지1.png -->
+  <img src="메인이미지1.png" alt="표지"/>
+  <div id="intro-hint">터치하면 책이 열려요</div>
+</div>
+
+<!-- 열기 전환용 오버레이 -->
+<div id="open-overlay"></div>
+
+<!-- AR 이동 버튼 -->
 <button id="go-ar" onclick="location.href='ar.html'">☁ 구름 따러 가기</button>
-<div id="hint">화면을 터치해서 넘기세요</div>
+<div id="page-num"></div>
 
 <script>
-// ══════════════════════════════════════════
-//  설정값
-// ══════════════════════════════════════════
-
-// ★ 페이지 이미지 파일명 목록 (순서대로)
+// ══════════════════════════════════════════════════
+//  ★ 설정: 페이지 이미지 파일명 목록
+//    page0 = 첫 펼침 (메인이미지2), 이후 본인 페이지들
+// ══════════════════════════════════════════════════
 const PAGE_SRCS = [
-  'page0.jpg',
+  '메인이미지2.jpg',   // 첫 펼침 (표지 열리면 나오는 장면)
   'page1.jpg',
   'page2.jpg',
   'page3.jpg',
   'page4.jpg',
 ];
+const TOTAL = PAGE_SRCS.length;
 
-// 책 크기 비율 (화면 대비)
-const BOOK_RATIO_W = 0.82;
-const BOOK_RATIO_H = 0.72;
+// ── 캔버스 셋업 ──
+const bgC   = document.getElementById('bg-canvas');
+const bgCtx = bgC.getContext('2d');
+const flC   = document.getElementById('flip-canvas');
+const flCtx = flC.getContext('2d');
 
-// ══════════════════════════════════════════
-//  캔버스 & 상태
-// ══════════════════════════════════════════
-const canvas = document.getElementById('book-canvas');
-const ctx    = canvas.getContext('2d');
-
-let W, H, BX, BY, BW, BH; // 화면/책 좌표
+let W, H, BX, BY, BW, BH;
 
 function resize() {
-  W = canvas.width  = window.innerWidth;
-  H = canvas.height = window.innerHeight;
-  BW = Math.min(W * BOOK_RATIO_W, 360);
-  BH = Math.min(H * BOOK_RATIO_H, 520);
+  W = bgC.width  = flC.width  = window.innerWidth;
+  H = bgC.height = flC.height = window.innerHeight;
+  BW = Math.min(W * 0.94, 680);
+  BH = Math.min(H * 0.82, 560);
   BX = (W - BW) / 2;
   BY = (H - BH) / 2;
 }
 resize();
-window.addEventListener('resize', () => { resize(); render(); });
+window.addEventListener('resize', () => { resize(); renderAll(); });
 
-// 이미지 로드
+// ── 이미지 로드 ──
+// 배경 이미지 (메인이미지2 — 책 펼침 배경)
+const bgImg = new Image();
+bgImg.src = '메인이미지2.jpg';
+bgImg.onload = renderAll;
+
+// 페이지 이미지들
 const imgs = PAGE_SRCS.map(src => {
   const img = new Image();
   img.src = src;
-  img.onload = render;
+  img.onload = () => { if (!flipping) renderAll(); };
   return img;
 });
 
-const TOTAL = PAGE_SRCS.length;
-let curPage  = 0;    // 현재 보이는 페이지 인덱스
+// ══════════════════════════════════════════════════
+//  촛불 빛 일렁임 시스템
+// ══════════════════════════════════════════════════
+/*
+  촛불 2개 (이미지에서 보이는 위치 근사)
+  각 촛불마다:
+  - 중심 밝기 (radial gradient)
+  - 랜덤 노이즈로 밝기/반지름 미세 변동
+  - 다른 주기로 흔들려서 자연스럽게
+*/
+const candles = [
+  { xR: 0.33, yR: 0.22, r: 0.28, phase: 0,    speed: 0.0017 },
+  { xR: 0.68, yR: 0.18, r: 0.25, phase: 1.8,  speed: 0.0021 },
+];
 
-// 페이지 넘기기 애니메이션 상태
-let flipping     = false;  // 애니메이션 진행 중?
-let flipDir      = 1;      // 1=다음, -1=이전
-let flipProgress = 0;      // 0.0 ~ 1.0
-let flipRAF      = null;
+// Perlin-like 노이즈 (간단한 sin 합성)
+function flicker(t, phase, speed) {
+  return (
+    Math.sin(t * speed * 1.00 + phase) * 0.40 +
+    Math.sin(t * speed * 2.73 + phase + 0.5) * 0.25 +
+    Math.sin(t * speed * 5.17 + phase + 1.2) * 0.15 +
+    Math.sin(t * speed * 9.31 + phase + 2.1) * 0.08 +
+    Math.sin(t * speed * 17.6 + phase + 0.9) * 0.04
+  ) / (0.40 + 0.25 + 0.15 + 0.08 + 0.04);
+}
 
-// ══════════════════════════════════════════
-//  그리기 유틸
-// ══════════════════════════════════════════
+let raf = null;
 
-// 이미지 or 플레이스홀더를 클리핑 된 영역에 그리기
-function drawPageContent(img, idx, x, y, w, h) {
+function drawCandles(t) {
+  bgCtx.clearRect(0, 0, W, H);
+
+  // 1) 배경: 책 펼침 이미지 (메인이미지2)
+  if (bgImg.complete && bgImg.naturalWidth > 0) {
+    bgCtx.drawImage(bgImg, 0, 0, W, H);
+  } else {
+    bgCtx.fillStyle = '#1a0f05';
+    bgCtx.fillRect(0, 0, W, H);
+  }
+
+  // 2) 전체 어둠 오버레이 (촛불 전후 분위기)
+  bgCtx.fillStyle = 'rgba(0,0,0,0.45)';
+  bgCtx.fillRect(0, 0, W, H);
+
+  // 3) 각 촛불 빛
+  candles.forEach(c => {
+    const f   = flicker(t, c.phase, c.speed);
+    const cx  = W * c.xR;
+    const cy  = H * c.yR;
+    const r   = Math.min(W, H) * c.r * (1 + f * 0.12);
+    const alpha = 0.55 + f * 0.18;
+
+    const gr = bgCtx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gr.addColorStop(0,   `rgba(255,230,150,${alpha})`);
+    gr.addColorStop(0.2, `rgba(255,180,80,${alpha * 0.6})`);
+    gr.addColorStop(0.5, `rgba(200,120,40,${alpha * 0.25})`);
+    gr.addColorStop(1,   'rgba(0,0,0,0)');
+
+    bgCtx.globalCompositeOperation = 'screen';
+    bgCtx.fillStyle = gr;
+    bgCtx.fillRect(0, 0, W, H);
+    bgCtx.globalCompositeOperation = 'source-over';
+  });
+
+  // 4) 책 영역 주변 비네팅 (가장자리 어둡게)
+  const vig = bgCtx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.2, W/2, H/2, Math.max(W,H)*0.75);
+  vig.addColorStop(0,   'rgba(0,0,0,0)');
+  vig.addColorStop(1,   'rgba(0,0,0,0.65)');
+  bgCtx.fillStyle = vig;
+  bgCtx.fillRect(0, 0, W, H);
+}
+
+// ══════════════════════════════════════════════════
+//  페이지 플립 (Canvas 슬라이스 방식)
+// ══════════════════════════════════════════════════
+let curPage  = 0;
+let flipping = false;
+let flipDir  = 1;
+let flipProg = 0;
+const FLIP_DUR = 650;
+
+function drawPageContent(ctx, img, idx, x, y, w, h) {
   ctx.save();
+  ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
 
-  if (img.complete && img.naturalWidth > 0) {
-    // 이미지 있음: sepia 느낌 (실제 filter는 canvas에서 제한적이므로 overlay로 대체)
+  if (img && img.complete && img.naturalWidth > 0) {
     ctx.drawImage(img, x, y, w, h);
-    // 오래된 책 오버레이
-    ctx.fillStyle = 'rgba(120,80,20,0.08)';
+    // 따뜻한 오래된 책 오버레이
+    ctx.fillStyle = 'rgba(100,60,10,0.10)';
     ctx.fillRect(x, y, w, h);
   } else {
     // 플레이스홀더
     const gr = ctx.createLinearGradient(x, y, x, y+h);
-    gr.addColorStop(0, '#f0e0c0');
-    gr.addColorStop(1, '#e0cc9a');
-    ctx.fillStyle = gr;
-    ctx.fillRect(x, y, w, h);
-    // 줄 노트
-    for (let ly = y+28; ly < y+h; ly += 28) {
-      ctx.strokeStyle = 'rgba(139,90,43,0.1)';
-      ctx.lineWidth = 0.8;
-      ctx.beginPath(); ctx.moveTo(x, ly); ctx.lineTo(x+w, ly); ctx.stroke();
+    gr.addColorStop(0, '#f0e0c0'); gr.addColorStop(1, '#e0cc9a');
+    ctx.fillStyle = gr; ctx.fillRect(x, y, w, h);
+    for (let ly = y+28; ly < y+h; ly+=28) {
+      ctx.strokeStyle = 'rgba(139,90,43,0.1)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(x,ly); ctx.lineTo(x+w,ly); ctx.stroke();
     }
-    // 번호
     ctx.fillStyle = 'rgba(100,60,20,0.18)';
-    ctx.font = `bold ${Math.min(w,h)*0.22}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.font = `bold ${h*0.2}px serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(idx === 0 ? '📖' : String(idx), x+w/2, y+h/2);
-    ctx.fillStyle = 'rgba(100,60,20,0.28)';
-    ctx.font = `${14}px serif`;
-    ctx.fillText(PAGE_SRCS[idx], x+w/2, y+h/2 + Math.min(w,h)*0.15);
+    ctx.fillStyle = 'rgba(100,60,20,0.3)';
+    ctx.font = `${13}px serif`;
+    ctx.fillText(PAGE_SRCS[idx], x+w/2, y+h/2 + h*0.13);
   }
 
-  // 제본 그림자 (왼쪽)
-  const sg = ctx.createLinearGradient(x, y, x+w*0.18, y);
-  sg.addColorStop(0,   'rgba(0,0,0,0.30)');
-  sg.addColorStop(0.4, 'rgba(0,0,0,0.07)');
+  // 제본 그림자
+  const sg = ctx.createLinearGradient(x, y, x+w*0.14, y);
+  sg.addColorStop(0,   'rgba(0,0,0,0.35)');
+  sg.addColorStop(0.5, 'rgba(0,0,0,0.07)');
   sg.addColorStop(1,   'transparent');
-  ctx.fillStyle = sg;
-  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = sg; ctx.fillRect(x, y, w, h);
 
   ctx.restore();
 }
 
-// 책 외곽 그림자
-function drawBookShadow() {
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.7)';
-  ctx.shadowBlur  = 40;
-  ctx.shadowOffsetX = 6;
-  ctx.shadowOffsetY = 20;
-  ctx.fillStyle = 'rgba(0,0,0,0.01)';
-  ctx.beginPath();
-  ctx.roundRect(BX, BY, BW, BH, 4);
-  ctx.fill();
-  ctx.restore();
-}
+function drawFlip(progress) {
+  flCtx.clearRect(0, 0, W, H);
 
-// 책 척추(제본)
-function drawSpine() {
-  ctx.save();
-  const sg = ctx.createLinearGradient(BX, 0, BX+14, 0);
-  sg.addColorStop(0,   '#120601');
-  sg.addColorStop(0.5, '#4a2808');
-  sg.addColorStop(1,   '#1e0a02');
-  ctx.fillStyle = sg;
-  ctx.fillRect(BX, BY, 12, BH);
-  ctx.restore();
-}
-
-// ══════════════════════════════════════════
-//  핵심: 구부러지는 종이 넘기기
-// ══════════════════════════════════════════
-/*
-  원리:
-  종이가 왼쪽 제본에서 오른쪽으로 넘어갈 때
-  오른쪽 끝이 먼저 접히고, 중간은 곡선으로 구부러짐.
-
-  구현:
-  - 넘어가는 페이지를 여러 세로 "슬라이스"로 나눔
-  - 각 슬라이스마다 x위치에 따라 y오프셋(곡선 구부러짐) 계산
-  - Canvas의 drawImage 소스 영역 + 변환 행렬로 슬라이스 그리기
-  - 뒷면(다음/이전 페이지 살짝 보임)도 그려서 입체감
-*/
-function drawFlippingPage(progress) {
-  // progress: 0=시작, 1=완료
-  // flipDir: 1=다음으로 넘기기, -1=이전으로 돌아오기
-
-  // 넘어가는 페이지 (현재)
-  const fromIdx = flipDir === 1 ? curPage : curPage - 1;
-  // 넘어간 후 보이는 페이지
+  const fromIdx = flipDir === 1 ? curPage     : curPage - 1;
   const toIdx   = flipDir === 1 ? curPage + 1 : curPage;
-
   const fromImg = imgs[fromIdx];
   const toImg   = toIdx < TOTAL ? imgs[toIdx] : null;
 
-  // 1) 뒤에 깔릴 페이지 먼저 그리기
-  if (toImg !== null) {
-    drawPageContent(toImg, toIdx, BX, BY, BW, BH);
-  }
+  // 뒤에 깔릴 페이지
+  if (toImg) drawPageContent(flCtx, toImg, toIdx, BX, BY, BW, BH);
 
-  // 2) 넘어가는 페이지를 슬라이스로 분해
-  //    p=0: 페이지가 오른쪽에 펼쳐져 있음
-  //    p=1: 왼쪽으로 완전히 넘어감
-  const p = flipDir === 1 ? progress : (1 - progress);
+  // 넘어가는 페이지 슬라이스
+  const p = flipDir === 1 ? progress : 1 - progress;
+  const ease = p < 0.5
+    ? 4*p*p*p
+    : 1 - Math.pow(-2*p+2,3)/2;
+  const foldX = 1 - ease;
 
-  // 슬라이스 수 (많을수록 부드럽지만 느림)
+  // 오프스크린에 원본 렌더
+  const off = document.createElement('canvas');
+  off.width = BW; off.height = BH;
+  const oc  = off.getContext('2d');
+  drawPageContent(oc, fromImg, fromIdx, 0, 0, BW, BH);
+
   const SLICES = 60;
-  const sliceW = BW / SLICES;
-
-  // 오프스크린 캔버스에 원본 페이지 그리기
-  const offscreen = document.createElement('canvas');
-  offscreen.width  = BW;
-  offscreen.height = BH;
-  const offCtx = offscreen.getContext('2d');
-
-  if (fromImg.complete && fromImg.naturalWidth > 0) {
-    offCtx.drawImage(fromImg, 0, 0, BW, BH);
-    offCtx.fillStyle = 'rgba(120,80,20,0.08)';
-    offCtx.fillRect(0, 0, BW, BH);
-  } else {
-    // 플레이스홀더
-    const gr = offCtx.createLinearGradient(0, 0, 0, BH);
-    gr.addColorStop(0, '#f0e0c0'); gr.addColorStop(1, '#e0cc9a');
-    offCtx.fillStyle = gr; offCtx.fillRect(0, 0, BW, BH);
-    for (let ly = 28; ly < BH; ly += 28) {
-      offCtx.strokeStyle = 'rgba(139,90,43,0.1)'; offCtx.lineWidth = 0.8;
-      offCtx.beginPath(); offCtx.moveTo(0, ly); offCtx.lineTo(BW, ly); offCtx.stroke();
-    }
-    offCtx.fillStyle = 'rgba(100,60,20,0.18)';
-    offCtx.font = `bold ${BH*0.22}px serif`;
-    offCtx.textAlign = 'center'; offCtx.textBaseline = 'middle';
-    offCtx.fillText(fromIdx === 0 ? '📖' : String(fromIdx), BW/2, BH/2);
-  }
-
-  ctx.save();
-
+  flCtx.save();
   for (let i = 0; i < SLICES; i++) {
-    // 각 슬라이스의 원본 x 비율 (0~1)
     const t  = i / SLICES;
-    const t1 = (i + 1) / SLICES;
+    if (t >= foldX) continue;
+    const t1 = (i+1) / SLICES;
 
-    // ── 접힘 곡선 계산 ──
-    // 종이가 넘어갈 때:
-    //   오른쪽 부분이 먼저 들리고
-    //   왼쪽(제본 쪽)은 나중에 따라옴
-    //
-    // 각 슬라이스의 "보이는 x 위치" 계산
-    // p=0: 전체 펼쳐짐(t → t 그대로)
-    // p=1: 완전히 넘어감 (x가 음수 = 화면 밖)
-
-    // 접히는 정도: 오른쪽일수록 먼저 접힘
-    // 베지어 곡선으로 자연스러운 가속도 표현
-    const ease = p < 0.5
-      ? 4 * p * p * p
-      : 1 - Math.pow(-2*p + 2, 3) / 2;
-
-    // 슬라이스 x 위치 (접힘 반영)
-    // 종이 오른쪽 끝이 왼쪽으로 이동
-    const foldX = 1 - ease;  // 0: 왼쪽 끝, 1: 오른쪽 끝
-    const xPos  = t * foldX; // 슬라이스 위치 (0~foldX 범위로 압축)
-
-    // y 오프셋: 종이 구부러짐
-    // 중간 지점에서 가장 많이 구부러짐
-    const bendAmt = Math.sin(ease * Math.PI) * BH * 0.06;
-    const yBend   = Math.sin(t * Math.PI) * bendAmt;
-
-    // 슬라이스 높이 (구부러지면 살짝 늘어남처럼 보임)
+    const xPos   = t * foldX;
+    const bendAmt= Math.sin(ease * Math.PI) * BH * 0.055;
+    const yBend  = Math.sin(t * Math.PI) * bendAmt;
     const hScale = 1 - Math.abs(yBend) / BH * 0.04;
+    const shadow = Math.min(0.5, ease * (1-t) * 1.2);
 
-    // 명암: 접히는 중간(오른쪽)은 더 어둡게
-    // 오른쪽 끝 부분은 뒷면이 보이기 시작
-    const distFromFold = Math.abs(t - foldX);
-    const shadow = Math.min(0.5, ease * (1 - t) * 1.2);
-
-    // 뒷면이 보이기 시작하는 지점 (foldX 오른쪽)
-    if (t >= foldX) continue; // 접힌 부분은 그리지 않음
-
-    const sx  = t  * BW;
-    const sw  = (t1 - t) * BW;
-    const dx  = BX + xPos * BW;
-    const dw  = sw * foldX; // 압축된 너비
-    const dy  = BY + yBend;
-    const dh  = BH * hScale;
-
+    const sx = t * BW, sw = (t1-t) * BW;
+    const dx = BX + xPos * BW;
+    const dw = sw * foldX;
+    const dy = BY + yBend;
+    const dh = BH * hScale;
     if (dw <= 0) continue;
 
-    // 슬라이스 그리기
-    ctx.drawImage(offscreen,
-      sx, 0, sw, BH,
-      dx, dy, Math.max(0.5, dw), dh
-    );
+    flCtx.drawImage(off, sx, 0, sw, BH, dx, dy, Math.max(0.5, dw), dh);
 
-    // 슬라이스 위에 명암 오버레이
     if (shadow > 0.02) {
-      ctx.fillStyle = `rgba(0,0,0,${shadow * 0.7})`;
-      ctx.fillRect(dx, dy, Math.max(0.5, dw), dh);
+      flCtx.fillStyle = `rgba(0,0,0,${shadow * 0.65})`;
+      flCtx.fillRect(dx, dy, Math.max(0.5,dw), dh);
     }
 
-    // 하이라이트 (접히는 선 근처)
-    const highlight = Math.max(0, 0.15 - distFromFold * 3) * (1 - ease);
-    if (highlight > 0.01) {
-      ctx.fillStyle = `rgba(255,240,200,${highlight})`;
-      ctx.fillRect(dx, dy, Math.max(0.5, dw), dh);
-    }
-  }
-
-  // 뒷면 살짝 보이기 (접힌 부분 오른쪽)
-  const foldEdge = (1 - (p < 0.5 ? 4*p*p*p : 1 - Math.pow(-2*p+2,3)/2));
-  if (foldEdge < 0.98) {
-    const backW = Math.min(BW * (1 - foldEdge) * 0.3, BW * 0.15);
-    const backX = BX + foldEdge * BW;
-    if (backW > 1) {
-      const backGr = ctx.createLinearGradient(backX, 0, backX + backW, 0);
-      backGr.addColorStop(0, 'rgba(200,170,120,0.5)');
-      backGr.addColorStop(1, 'rgba(180,150,100,0.1)');
-      ctx.fillStyle = backGr;
-      ctx.fillRect(backX, BY, backW, BH);
+    const distF = Math.abs(t - foldX);
+    const hl    = Math.max(0, 0.14 - distF * 3) * (1-ease);
+    if (hl > 0.01) {
+      flCtx.fillStyle = `rgba(255,240,190,${hl})`;
+      flCtx.fillRect(dx, dy, Math.max(0.5,dw), dh);
     }
   }
+  flCtx.restore();
 
-  ctx.restore();
+  // 뒷면 살짝
+  const backW = Math.min(BW*(1-foldX)*0.28, BW*0.13);
+  const backX = BX + foldX * BW;
+  if (backW > 1) {
+    const bg2 = flCtx.createLinearGradient(backX, 0, backX+backW, 0);
+    bg2.addColorStop(0, 'rgba(200,170,110,0.48)');
+    bg2.addColorStop(1, 'rgba(180,150,90,0.08)');
+    flCtx.fillStyle = bg2;
+    flCtx.fillRect(backX, BY, backW, BH);
+  }
+
+  // 척추
+  flCtx.save();
+  const sp = flCtx.createLinearGradient(BX, 0, BX+13, 0);
+  sp.addColorStop(0,   '#120601');
+  sp.addColorStop(0.5, '#4a2808');
+  sp.addColorStop(1,   '#1e0a02');
+  flCtx.fillStyle = sp;
+  flCtx.fillRect(BX, BY, 12, BH);
+  flCtx.restore();
 }
 
-// ══════════════════════════════════════════
-//  메인 렌더
-// ══════════════════════════════════════════
-function render() {
-  ctx.clearRect(0, 0, W, H);
+function drawStatic() {
+  flCtx.clearRect(0, 0, W, H);
+  drawPageContent(flCtx, imgs[curPage], curPage, BX, BY, BW, BH);
 
-  drawBookShadow();
+  // 책 외곽
+  flCtx.save();
+  flCtx.strokeStyle = 'rgba(0,0,0,0.55)';
+  flCtx.lineWidth = 1.2;
+  flCtx.beginPath();
+  flCtx.roundRect(BX, BY, BW, BH, 4);
+  flCtx.stroke();
+  flCtx.restore();
 
+  // 척추
+  flCtx.save();
+  const sp = flCtx.createLinearGradient(BX, 0, BX+13, 0);
+  sp.addColorStop(0,   '#120601');
+  sp.addColorStop(0.5, '#4a2808');
+  sp.addColorStop(1,   '#1e0a02');
+  flCtx.fillStyle = sp;
+  flCtx.fillRect(BX, BY, 12, BH);
+  flCtx.restore();
+}
+
+function renderAll() {
+  if (!flipping) drawStatic();
+}
+
+// ══════════════════════════════════════════════════
+//  메인 애니메이션 루프 (촛불 + 페이지 플립)
+// ══════════════════════════════════════════════════
+let flipStart = 0;
+let isBookOpen = false; // 인트로 끝나고 책 열렸는지
+
+function loop(t) {
+  // 촛불은 항상 렌더 (인트로 숨겨져 있어도 준비)
+  drawCandles(t);
+
+  // 페이지 플립 중이면 진행
   if (flipping) {
-    drawFlippingPage(flipProgress);
-  } else {
-    // 정지 상태: 현재 페이지만
-    drawPageContent(imgs[curPage], curPage, BX, BY, BW, BH);
-  }
-
-  drawSpine();
-
-  // 책 외곽선
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(BX, BY, BW, BH, 4);
-  ctx.stroke();
-  ctx.restore();
-}
-
-// ══════════════════════════════════════════
-//  애니메이션
-// ══════════════════════════════════════════
-const FLIP_DURATION = 620; // ms
-
-function startFlip(dir) {
-  if (flipping) return;
-  if (dir === 1  && curPage >= TOTAL - 1) return;
-  if (dir === -1 && curPage <= 0)         return;
-
-  flipDir      = dir;
-  flipProgress = 0;
-  flipping     = true;
-
-  const start = performance.now();
-
-  function step(now) {
-    flipProgress = Math.min((now - start) / FLIP_DURATION, 1);
-    render();
-
-    if (flipProgress < 1) {
-      flipRAF = requestAnimationFrame(step);
-    } else {
-      // 완료
+    flipProg = Math.min((t - flipStart) / FLIP_DUR, 1);
+    drawFlip(flipProg);
+    if (flipProg >= 1) {
       flipping = false;
       if (flipDir === 1) curPage++;
       else               curPage--;
-      render();
+      drawStatic();
       updateUI();
     }
   }
-  flipRAF = requestAnimationFrame(step);
+
+  raf = requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ══════════════════════════════════════════════════
+//  인트로: 표지 → 책 열기
+// ══════════════════════════════════════════════════
+const introEl   = document.getElementById('intro');
+const overlayEl = document.getElementById('open-overlay');
+
+function openBook() {
+  if (isBookOpen) return;
+  isBookOpen = true;
+
+  // 1) 인트로 이미지 줌인 + 페이드아웃
+  introEl.style.transition = 'transform 0.9s cubic-bezier(0.4,0,0.2,1), opacity 0.7s 0.3s ease';
+  introEl.style.transform  = 'scale(1.18)';
+  introEl.style.opacity    = '0';
+
+  // 2) 검은 오버레이로 순간 전환
+  overlayEl.style.display  = 'block';
+  overlayEl.style.transition = 'opacity 0.35s 0.5s ease';
+  overlayEl.style.opacity  = '1';
+
+  setTimeout(() => {
+    introEl.style.display = 'none';
+    // 3) 오버레이 사라지며 책 등장
+    overlayEl.style.transition = 'opacity 0.6s ease';
+    overlayEl.style.opacity  = '0';
+    setTimeout(() => {
+      overlayEl.style.display = 'none';
+      // 4) 첫 페이지 플립 (표지 → 메인이미지2)
+      //    책이 바로 펼쳐진 채로 등장하므로 플립 생략
+      //    그냥 정적으로 첫 페이지 보여줌
+      drawStatic();
+      updateUI();
+    }, 650);
+  }, 650);
 }
 
+// ── UI 업데이트 ──
 function updateUI() {
-  const hint  = document.getElementById('hint');
-  const goAR  = document.getElementById('go-ar');
+  const goAR   = document.getElementById('go-ar');
+  const pgNum  = document.getElementById('page-num');
 
-  if (curPage >= 2) hint.style.opacity = '0';
-  else              hint.style.opacity = '1';
+  pgNum.textContent = isBookOpen ? `${curPage+1} / ${TOTAL}` : '';
 
   if (curPage === TOTAL - 1) {
     goAR.style.display = 'block';
-    hint.style.opacity = '0';
+    pgNum.style.opacity = '0';
   } else {
     goAR.style.display = 'none';
+    pgNum.style.opacity = '1';
   }
 }
 
-// ══════════════════════════════════════════
-//  입력 처리
-// ══════════════════════════════════════════
-let touchStartX = 0, touchStartY = 0;
+// ── 터치/클릭 처리 ──
+let touchStartX = 0;
+const touchLayer = document.getElementById('touch-layer');
+const introHint  = document.querySelector('#intro-hint');
 
-// 터치
-canvas.addEventListener('touchstart', e => {
+touchLayer.addEventListener('touchstart', e => {
   touchStartX = e.touches[0].clientX;
-  touchStartY = e.touches[0].clientY;
 }, { passive: true });
 
-canvas.addEventListener('touchend', e => {
+touchLayer.addEventListener('touchend', e => {
+  if (!isBookOpen) { openBook(); return; }
+  if (flipping) return;
   const dx = e.changedTouches[0].clientX - touchStartX;
-  const dy = e.changedTouches[0].clientY - touchStartY;
-  if (Math.abs(dy) > Math.abs(dx) * 1.5) return; // 수직 스크롤 무시
   if (Math.abs(dx) > 30) {
     startFlip(dx < 0 ? 1 : -1);
   } else {
-    // 짧은 탭: 오른쪽 반 = 다음, 왼쪽 반 = 이전
-    const x = e.changedTouches[0].clientX;
-    startFlip(x > W / 2 ? 1 : -1);
+    startFlip(e.changedTouches[0].clientX > W/2 ? 1 : -1);
   }
 }, { passive: true });
 
-// 마우스 클릭 (PC 테스트용)
-canvas.addEventListener('click', e => {
-  startFlip(e.clientX > W / 2 ? 1 : -1);
+touchLayer.addEventListener('click', e => {
+  if (!isBookOpen) { openBook(); return; }
+  if (flipping) return;
+  startFlip(e.clientX > W/2 ? 1 : -1);
 });
 
-// ══════════════════════════════════════════
-//  시작
-// ══════════════════════════════════════════
-render();
-updateUI();
+// 인트로 영역 직접 클릭도 처리
+introEl.addEventListener('click', () => { if (!isBookOpen) openBook(); });
+
+function startFlip(dir) {
+  if (flipping) return;
+  if (dir === 1  && curPage >= TOTAL-1) return;
+  if (dir === -1 && curPage <= 0)       return;
+  flipDir   = dir;
+  flipProg  = 0;
+  flipping  = true;
+  flipStart = performance.now();
+}
 </script>
 </body>
 </html>
