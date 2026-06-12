@@ -308,27 +308,35 @@ function loop(t){
 }
 requestAnimationFrame(loop);
 
-// 페이지 로드: 검은화면 → 표지 페이드인
+// 페이지 로드: 검은화면 → 자동으로 표지 페이드인 → 힌트 등장 → 그때부터 터치 받음
 window.addEventListener('load', ()=>{
-  // 0.5초 검은화면 유지 후 표지 페이드인 시작
+  // 터치 완전히 막기
+  document.getElementById('touch-layer').style.pointerEvents = 'none';
+
+  // 0.6초 검은화면 유지
   setTimeout(()=>{
     STATE = 'cover';
     const startTime = performance.now();
-    const dur = 2000; // 2초에 걸쳐 밝아짐
-    function fadeIn(t){
-      const elapsed = t - startTime;
+    const dur = 2200; // 2.2초에 걸쳐 밝아짐
+
+    function fadeIn(now){
+      const elapsed = now - startTime;
       coverAlpha = Math.min(elapsed / dur, 1);
-      if(coverAlpha < 1) requestAnimationFrame(fadeIn);
-      else {
+      if(coverAlpha < 1){
+        requestAnimationFrame(fadeIn);
+      } else {
+        // 완전히 밝아진 후
         coverAlpha = 1;
-        // 힌트 등장
-        document.getElementById('cover-hint').style.color='rgba(255,220,140,0.75)';
-        // touch-layer 활성화 (이제 터치 받음)
-        document.getElementById('touch-layer').style.pointerEvents='auto';
+        // 힌트 텍스트 등장
+        document.getElementById('cover-hint').style.color = 'rgba(255,220,140,0.75)';
+        // 힌트 뜨고 0.5초 후에 터치 활성화
+        setTimeout(()=>{
+          document.getElementById('touch-layer').style.pointerEvents = 'auto';
+        }, 500);
       }
     }
     requestAnimationFrame(fadeIn);
-  }, 500);
+  }, 600);
 });
 
 // ══════════════════════════════════════════
