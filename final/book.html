@@ -51,7 +51,7 @@
 <canvas id="flip-canvas"></canvas>
 <div id="touch-layer"></div>
 <div id="intro">
-  <img src="메인이미지1.png" alt="표지"/>
+  <img src="main1.png" alt="표지"/>
   <div id="intro-hint">터치하면 책이 열려요</div>
 </div>
 <div id="open-overlay"></div>
@@ -62,14 +62,14 @@
 // ★ 페이지 설정
 // null = 해당 쪽 비움 (배경만 보임)
 const SPREADS = [
-  [null,             'page0_right.jpg'],  // 표지: 오른쪽만
-  ['page1_left.jpg', 'page1_right.jpg'],
-  ['page2_left.jpg', 'page2_right.jpg'],
-  ['page3_left.jpg', 'page3_right.jpg'],
-  ['page4_left.jpg', 'page4_right.jpg'],
-  ['page5_left.jpg', 'page5_right.jpg'],
-  ['page6_left.jpg', 'page6_right.jpg'],
-  ['page7_left.jpg', 'page7_right.jpg'],
+  [null,             'page0_right.png'],  // 표지: 오른쪽만
+  ['page1_left.png', 'page1_right.png'],
+  ['page2_left.png', 'page2_right.png'],
+  ['page3_left.png', 'page3_right.png'],
+  ['page4_left.png', 'page4_right.png'],
+  ['page5_left.png', 'page5_right.png'],
+  ['page6_left.png', 'page6_right.png'],
+  ['page7_left.png', 'page7_right.png'],
 ];
 const TOTAL_SPREADS = SPREADS.length;
 
@@ -114,7 +114,7 @@ function toScr(ox, oy, ow, oh) {
 }
 
 // ── 이미지 로드
-const bgImg     = loadImg('메인이미지2.jpg');
+const bgImg     = loadImg('main2.jpg');
 const leftMask  = loadImg('left_mask.png');
 const rightMask = loadImg('right_mask.png');
 const allImgs   = {};
