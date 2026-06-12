@@ -122,9 +122,29 @@ function tryStart() {
 }
 
 // ════════════════════════════════════════
-//  상태
-//  phase: 'black' → 'fadein' → 'cover' → 'opening' → 'book'
+//  오디오
 // ════════════════════════════════════════
+const candleAudio = new Audio('candle.mp3');
+candleAudio.loop   = true;
+candleAudio.volume = 0;
+
+const rainAudio = new Audio('rain.mp3');
+rainAudio.loop   = true;
+rainAudio.volume = 0;
+
+// 볼륨 페이드 유틸
+function fadeVolume(audio, targetVol, durationMs) {
+  const startVol = audio.volume;
+  const diff     = targetVol - startVol;
+  const steps    = 40;
+  const interval = durationMs / steps;
+  let step = 0;
+  const timer = setInterval(() => {
+    step++;
+    audio.volume = Math.min(1, Math.max(0, startVol + diff * (step / steps)));
+    if (step >= steps) clearInterval(timer);
+  }, interval);
+}
 let phase       = 'black';
 let fadeStart   = 0;    // fadein 시작 타임스탬프
 const FADE_DUR  = 4400; // ms (2배)
@@ -222,6 +242,8 @@ function loop(ts) {
       drawStatic();
       updateUI();
       tl.style.pointerEvents = 'auto';
+      // 빗소리 시작 (파일에 페이드인 내장)
+      rainAudio.play().catch(()=>{});
     }
 
   } else if (phase === 'book') {
@@ -241,6 +263,9 @@ function startSequence() {
   setTimeout(() => {
     fadeStart = performance.now();
     phase = 'fadein';
+    // 캔들 소리 시작 — 페이드인과 함께 서서히 커짐
+    candleAudio.play().catch(()=>{});
+    fadeVolume(candleAudio, 0.5, 4400);
   }, 1000);
 }
 
