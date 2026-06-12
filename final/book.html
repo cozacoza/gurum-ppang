@@ -127,7 +127,7 @@ function tryStart() {
 // ════════════════════════════════════════
 let phase       = 'black';
 let fadeStart   = 0;    // fadein 시작 타임스탬프
-const FADE_DUR  = 2200; // ms
+const FADE_DUR  = 4400; // ms (2배)
 let openStart   = 0;
 const OPEN_DUR  = 800;
 let bgZoom      = 1;
@@ -186,7 +186,12 @@ function loop(ts) {
       mCtx.drawImage(coverImg, 0, 0, W, H);
       mCtx.globalAlpha = 1;
     }
-    // 완전히 밝아지면 cover 단계로
+    // 촛불 (알파 0.3 이상부터 서서히 등장)
+    if (alpha > 0.3) {
+      mCtx.globalAlpha = (alpha - 0.3) / 0.7;
+      drawCandles(ts);
+      mCtx.globalAlpha = 1;
+    }
     if (alpha >= 1) {
       phase = 'cover';
       hint.style.color = 'rgba(255,220,140,0.75)';
@@ -194,11 +199,12 @@ function loop(ts) {
     }
 
   } else if (phase === 'cover') {
-    // cover 완전히 보임
+    // cover 완전히 보임 + 촛불
     mCtx.fillStyle='#000'; mCtx.fillRect(0,0,W,H);
     if (coverImg.naturalWidth > 0) {
       mCtx.drawImage(coverImg, 0, 0, W, H);
     }
+    drawCandles(ts);
 
   } else if (phase === 'opening') {
     // cover → book 전환: 검은화면 → main2 줌아웃 등장
@@ -231,11 +237,11 @@ function loop(ts) {
 //  시퀀스 시작 (cover + bg 로드 후)
 // ════════════════════════════════════════
 function startSequence() {
-  // 0.5초 검은화면 유지 후 fadein 시작
+  // 1초 검은화면 유지 후 fadein 시작
   setTimeout(() => {
     fadeStart = performance.now();
     phase = 'fadein';
-  }, 500);
+  }, 1000);
 }
 
 // rAF 루프 시작
