@@ -12,23 +12,17 @@
     #page-canvas{ z-index:5;  pointer-events:none; }
     #flip-canvas{ z-index:10; pointer-events:none; }
     #touch-layer{ z-index:20; position:fixed; inset:0; cursor:pointer; pointer-events:none; }
-    /* 표지 화면 */
-    #cover {
-      position:fixed; inset:0; z-index:30; overflow:hidden;
-      background:#000;
-      opacity:0;
-      transition: opacity 1.4s ease;
-    }
-    #cover img { width:100%; height:100%; object-fit:cover; display:block; }
+    @keyframes hintPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+    /* 힌트 텍스트 */
     #cover-hint {
-      position:absolute; bottom:36px; left:50%; transform:translateX(-50%);
-      color:rgba(255,220,140,0.75); font-size:15px; font-family:serif;
+      position:fixed; bottom:36px; left:50%; transform:translateX(-50%);
+      color:rgba(255,220,140,0); font-size:15px; font-family:serif;
       letter-spacing:2px; white-space:nowrap;
       text-shadow:0 0 12px rgba(255,180,60,0.8);
       animation:hintPulse 2s ease-in-out infinite;
-      opacity:0; transition: opacity 0.8s 1.5s ease;
+      z-index:40; pointer-events:none;
+      transition: color 0.8s ease;
     }
-    @keyframes hintPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
     #open-overlay { display:none; position:fixed; inset:0; z-index:35; background:#0a0704; opacity:0; }
     #go-ar {
       display:none; position:fixed; bottom:36px; left:50%; transform:translateX(-50%);
@@ -54,10 +48,7 @@
 <canvas id="page-canvas"></canvas>
 <canvas id="flip-canvas"></canvas>
 <div id="touch-layer"></div>
-<div id="cover">
-  <img src="cover.png" alt="표지"/>
-  <div id="cover-hint">오른쪽을 터치하면 책이 열려요</div>
-</div>
+<div id="cover-hint">오른쪽을 터치하면 책이 열려요</div>
 <div id="open-overlay"></div>
 <button id="go-ar" onclick="location.href='ar.html'">☁ 구름 따러 가기</button>
 <div id="page-num"></div>
@@ -72,7 +63,6 @@ const SPREADS = [
   ['page4_left.png', 'page4_right.png'],
   ['page5_left.png', 'page5_right.png'],
   ['page6_left.png', 'page6_right.png'],
-  ['page7_left.png', 'page7_right.png'],
 ];
 const TOTAL_SPREADS = SPREADS.length;
 
@@ -117,7 +107,8 @@ function toScr(ox, oy, ow, oh) {
 }
 
 // ── 이미지 로드
-const bgImg = loadImg('main2.jpg');
+const bgImg   = loadImg('main2.jpg');
+const coverImg = loadImg('cover.png');
 const allImgs   = {};
 SPREADS.forEach(([l,r]) => {
   if(l) allImgs[l]=loadImg(l);
@@ -245,16 +236,38 @@ function flicker(t,ph,sp){
 }
 function drawBg(t){
   bgCtx.clearRect(0,0,W,H);
+
+  if(STATE === 'black'){
+    // 검은 화면
+    bgCtx.fillStyle='#000';
+    bgCtx.fillRect(0,0,W,H);
+    return;
+  }
+
+  if(STATE === 'cover'){
+    // 표지 이미지 페이드인
+    bgCtx.fillStyle='#000';
+    bgCtx.fillRect(0,0,W,H);
+    if(coverImg.complete && coverImg.naturalWidth>0){
+      bgCtx.globalAlpha = coverAlpha;
+      bgCtx.drawImage(coverImg, 0, 0, W, H);
+      bgCtx.globalAlpha = 1;
+    }
+    return;
+  }
+
+  // STATE === 'book': main2 + 촛불
   if(bgImg.complete&&bgImg.naturalWidth>0){
-    // 클로즈업 줌 효과
     const z = (typeof bgZoom !== 'undefined') ? bgZoom : 1;
     const zW = ORIG_W*imgScale*z;
     const zH = ORIG_H*imgScale*z;
     const zX = imgOffX - (zW - ORIG_W*imgScale)/2;
     const zY = imgOffY - (zH - ORIG_H*imgScale)/2;
     bgCtx.drawImage(bgImg, zX, zY, zW, zH);
+  } else {
+    bgCtx.fillStyle='#1a0f05';
+    bgCtx.fillRect(0,0,W,H);
   }
-  else{bgCtx.fillStyle='#1a0f05';bgCtx.fillRect(0,0,W,H);}
   bgCtx.fillStyle='rgba(0,0,0,0.42)';bgCtx.fillRect(0,0,W,H);
   candles.forEach(c=>{
     const f=flicker(t,c.phase,c.speed),cx=W*c.xR,cy=H*c.yR;
@@ -276,7 +289,10 @@ function drawBg(t){
 // ══════════════════════════════════════════
 //  메인 루프
 // ══════════════════════════════════════════
-let isBookOpen=false;
+// 상태: 'black'(검은화면) → 'cover'(표지) → 'book'(책)
+let STATE = 'black';
+let coverAlpha = 0;   // 표지 페이드인 진행도 (0~1)
+let isBookOpen = false;
 function loop(t){
   drawBg(t);
   if(isBookOpen&&flipping){
@@ -292,17 +308,27 @@ function loop(t){
 }
 requestAnimationFrame(loop);
 
-// 페이지 로드 후 표지 페이드인 (검은화면 → 밝아짐)
+// 페이지 로드: 검은화면 → 표지 페이드인
 window.addEventListener('load', ()=>{
-  const coverEl = document.getElementById('cover');
-  // 살짝 딜레이 후 페이드인
+  // 0.5초 검은화면 유지 후 표지 페이드인 시작
   setTimeout(()=>{
-    coverEl.style.opacity = '1';
-    // 힌트도 함께 등장
-    setTimeout(()=>{
-      document.getElementById('cover-hint').style.opacity = '1';
-    }, 1500);
-  }, 300);
+    STATE = 'cover';
+    const startTime = performance.now();
+    const dur = 2000; // 2초에 걸쳐 밝아짐
+    function fadeIn(t){
+      const elapsed = t - startTime;
+      coverAlpha = Math.min(elapsed / dur, 1);
+      if(coverAlpha < 1) requestAnimationFrame(fadeIn);
+      else {
+        coverAlpha = 1;
+        // 힌트 등장
+        document.getElementById('cover-hint').style.color='rgba(255,220,140,0.75)';
+        // touch-layer 활성화 (이제 터치 받음)
+        document.getElementById('touch-layer').style.pointerEvents='auto';
+      }
+    }
+    requestAnimationFrame(fadeIn);
+  }, 500);
 });
 
 // ══════════════════════════════════════════
@@ -312,37 +338,30 @@ window.addEventListener('load', ()=>{
 const overlayEl=document.getElementById('open-overlay');
 
 function openBook(){
-  if(isBookOpen)return;
-  isBookOpen=true;
+  if(isBookOpen) return;
+  if(STATE !== 'cover') return;  // 표지 상태일 때만 열기 가능
+  isBookOpen = true;
+  STATE = 'book';
 
-  // touch-layer 활성화
-  document.getElementById('touch-layer').style.pointerEvents='auto';
+  // 힌트 숨기기
+  document.getElementById('cover-hint').style.color='rgba(255,220,140,0)';
 
-  // 1) 표지 줌인 + 페이드아웃
-  const coverEl = document.getElementById('cover');
-  coverEl.style.transition='transform 1.0s cubic-bezier(0.4,0,0.2,1), opacity 0.6s 0.4s ease';
-  coverEl.style.transform='scale(1.35)';
-  coverEl.style.opacity='0';
-
-  // 2) 검은 오버레이
+  // 검은 오버레이 잠깐 등장
   overlayEl.style.display='block';
-  overlayEl.style.transition='opacity 0.4s 0.5s ease';
-  overlayEl.style.opacity='1';
+  overlayEl.style.opacity='0';
+  overlayEl.style.transition='opacity 0.4s ease';
+  setTimeout(()=>{ overlayEl.style.opacity='1'; }, 10);
 
   setTimeout(()=>{
-    coverEl.style.display='none';
-
-    // 3) main2 줌인→줌아웃 효과
+    // main2 줌인→줌아웃
     zoomInBg();
-
-    // 4) 오버레이 사라짐
     overlayEl.style.transition='opacity 0.7s ease';
     overlayEl.style.opacity='0';
     setTimeout(()=>{
       overlayEl.style.display='none';
       drawStatic(); updateUI();
     }, 700);
-  }, 800);
+  }, 450);
 }
 
 // main2 클로즈업 → 원래 크기로 줌아웃
@@ -382,18 +401,20 @@ let touchStartX=0;
 const tl=document.getElementById('touch-layer');
 tl.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;},{passive:true});
 tl.addEventListener('touchend',e=>{
-  if(!isBookOpen){openBook();return;}
+  if(STATE==='cover'){openBook();return;}
+  if(!isBookOpen) return;
   if(flipping)return;
   const dx=e.changedTouches[0].clientX-touchStartX;
   if(Math.abs(dx)>30)startFlip(dx<0?1:-1);
   else startFlip(e.changedTouches[0].clientX>W/2?1:-1);
 },{passive:true});
 tl.addEventListener('click',e=>{
-  if(!isBookOpen){openBook();return;}
+  if(STATE==='cover'){openBook();return;}
+  if(!isBookOpen) return;
   if(flipping)return;
   startFlip(e.clientX>W/2?1:-1);
 });
-document.getElementById('cover').addEventListener('click',()=>{if(!isBookOpen)openBook();});
+// cover 클릭은 touch-layer가 처리
 </script>
 </body>
 </html>
