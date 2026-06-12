@@ -5,384 +5,265 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
   <title>구름빵</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0704; }
-
-    /* 배경 + 촛불 캔버스 */
-    #bg-canvas {
-      position: fixed; inset: 0; z-index: 0;
-      width: 100%; height: 100%;
-    }
-
-    /* 페이지 합성 캔버스 */
-    #page-canvas {
-      position: fixed; inset: 0; z-index: 5;
-      width: 100%; height: 100%;
-      pointer-events: none;
-    }
-
-    /* 터치 레이어 */
-    #touch-layer {
-      position: fixed; inset: 0; z-index: 20; cursor: pointer;
-    }
-
-    /* 인트로 (메인이미지1 — 표지) */
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html,body { width:100%; height:100%; overflow:hidden; background:#0a0704; }
+    canvas { position:fixed; inset:0; width:100%; height:100%; }
+    #bg-canvas  { z-index:0; }
+    #page-canvas{ z-index:5;  pointer-events:none; }
+    #flip-canvas{ z-index:10; pointer-events:none; }
+    #touch-layer{ z-index:20; position:fixed; inset:0; cursor:pointer; }
     #intro {
-      position: fixed; inset: 0; z-index: 30;
-      overflow: hidden;
+      position:fixed; inset:0; z-index:30; overflow:hidden;
       transition: transform 0.9s cubic-bezier(0.4,0,0.2,1), opacity 0.7s 0.3s ease;
     }
-    #intro img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #intro img { width:100%; height:100%; object-fit:cover; display:block; }
     #intro-hint {
-      position: absolute; bottom: 36px; left: 50%;
-      transform: translateX(-50%);
-      color: rgba(255,220,140,0.75);
-      font-size: 15px; font-family: serif; letter-spacing: 2px;
-      animation: hintPulse 2s ease-in-out infinite;
-      white-space: nowrap;
-      text-shadow: 0 0 12px rgba(255,180,60,0.8);
+      position:absolute; bottom:36px; left:50%; transform:translateX(-50%);
+      color:rgba(255,220,140,0.75); font-size:15px; font-family:serif;
+      letter-spacing:2px; white-space:nowrap;
+      text-shadow:0 0 12px rgba(255,180,60,0.8);
+      animation:hintPulse 2s ease-in-out infinite;
     }
     @keyframes hintPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
-
-    /* 전환 오버레이 */
-    #open-overlay {
-      display: none; position: fixed; inset: 0; z-index: 35;
-      background: #0a0704; opacity: 0;
-    }
-
-    /* 페이지 넘기기 플립 캔버스 */
-    #flip-canvas {
-      position: fixed; inset: 0; z-index: 10;
-      width: 100%; height: 100%;
-      pointer-events: none;
-    }
-
-    /* AR 버튼 */
+    #open-overlay { display:none; position:fixed; inset:0; z-index:35; background:#0a0704; opacity:0; }
     #go-ar {
-      display: none;
-      position: fixed; bottom: 36px; left: 50%;
-      transform: translateX(-50%);
-      padding: 13px 30px;
-      background: rgba(20,60,20,0.92);
-      color: #c8ffb0;
-      border: 1px solid rgba(100,200,80,0.5);
-      border-radius: 30px;
-      font-size: 18px; font-family: serif; letter-spacing: 1px;
-      cursor: pointer; z-index: 200; white-space: nowrap;
-      animation: arGlow 2.5s ease-in-out infinite;
+      display:none; position:fixed; bottom:36px; left:50%; transform:translateX(-50%);
+      padding:13px 30px; background:rgba(20,60,20,0.92); color:#c8ffb0;
+      border:1px solid rgba(100,200,80,0.5); border-radius:30px;
+      font-size:18px; font-family:serif; letter-spacing:1px;
+      cursor:pointer; z-index:200; white-space:nowrap;
+      animation:arGlow 2.5s ease-in-out infinite;
     }
     @keyframes arGlow {
-      0%,100%{ box-shadow: 0 0 14px rgba(60,180,60,0.35); }
-      50%    { box-shadow: 0 0 30px rgba(60,180,60,0.7); }
+      0%,100%{ box-shadow:0 0 14px rgba(60,180,60,0.35); }
+      50%    { box-shadow:0 0 30px rgba(60,180,60,0.7); }
     }
-
     #page-num {
-      position: fixed; bottom: 14px; left: 50%;
-      transform: translateX(-50%);
-      color: rgba(255,200,100,0.3);
-      font-size: 12px; font-family: serif; letter-spacing: 2px;
-      pointer-events: none; z-index: 100; transition: opacity 0.5s;
+      position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+      color:rgba(255,200,100,0.3); font-size:12px; font-family:serif;
+      letter-spacing:2px; pointer-events:none; z-index:100; transition:opacity 0.5s;
     }
   </style>
 </head>
 <body>
-
 <canvas id="bg-canvas"></canvas>
 <canvas id="page-canvas"></canvas>
 <canvas id="flip-canvas"></canvas>
 <div id="touch-layer"></div>
-
 <div id="intro">
   <img src="메인이미지1.png" alt="표지"/>
   <div id="intro-hint">터치하면 책이 열려요</div>
 </div>
 <div id="open-overlay"></div>
-
 <button id="go-ar" onclick="location.href='ar.html'">☁ 구름 따러 가기</button>
 <div id="page-num"></div>
 
 <script>
-// ══════════════════════════════════════════
-//  ★ 페이지 이미지 파일명 (순서대로)
-//    짝수 인덱스 = 왼쪽 페이지
-//    홀수 인덱스 = 오른쪽 페이지
-//    (두 장씩 펼쳐 보임)
-// ══════════════════════════════════════════
-const PAGE_SRCS = [
-  'page0_left.jpg',   // 0: 왼쪽
-  'page0_right.jpg',  // 1: 오른쪽
-  'page1_left.jpg',   // 2: 왼쪽
-  'page1_right.jpg',  // 3: 오른쪽
-  'page2_left.jpg',   // 4: 왼쪽
-  'page2_right.jpg',  // 5: 오른쪽
-  'page3_left.jpg',   // 6: 왼쪽
-  'page3_right.jpg',  // 7: 오른쪽
+// ★ 페이지 설정
+// null = 해당 쪽 비움 (배경만 보임)
+const SPREADS = [
+  [null,             'page0_right.jpg'],  // 표지: 오른쪽만
+  ['page1_left.jpg', 'page1_right.jpg'],
+  ['page2_left.jpg', 'page2_right.jpg'],
+  ['page3_left.jpg', 'page3_right.jpg'],
+  ['page4_left.jpg', 'page4_right.jpg'],
+  ['page5_left.jpg', 'page5_right.jpg'],
+  ['page6_left.jpg', 'page6_right.jpg'],
+  ['page7_left.jpg', 'page7_right.jpg'],
 ];
-// 총 펼침 수 = PAGE_SRCS.length / 2
-const TOTAL_SPREADS = Math.ceil(PAGE_SRCS.length / 2);
+const TOTAL_SPREADS = SPREADS.length;
 
-// ── 메인이미지2 원본 크기 (Python에서 계산한 값)
+// 메인이미지2 원본 크기
 const ORIG_W = 1088, ORIG_H = 645;
 
-// ── 페이지 영역 (메인이미지2 기준 픽셀)
-const LEFT_PAGE  = { x:136, y:80,  w:418, h:535 };
-const RIGHT_PAGE = { x:408, y:48,  w:576, h:609 };
+// 페이지 영역 (메인이미지2 원본 픽셀 기준)
+const L = { x:136, y:80,  w:418, h:535 };  // 왼쪽
+const R = { x:408, y:48,  w:576, h:609 };  // 오른쪽
 
 // ── 캔버스
-const bgC    = document.getElementById('bg-canvas');
-const bgCtx  = bgC.getContext('2d');
-const pgC    = document.getElementById('page-canvas');
-const pgCtx  = pgC.getContext('2d');
-const flC    = document.getElementById('flip-canvas');
-const flCtx  = flC.getContext('2d');
+const bgC=document.getElementById('bg-canvas');
+const bgCtx=bgC.getContext('2d');
+const pgC=document.getElementById('page-canvas');
+const pgCtx=pgC.getContext('2d');
+const flC=document.getElementById('flip-canvas');
+const flCtx=flC.getContext('2d');
 
-let W, H, scale, offX, offY;
+let W, H;
+// 메인이미지2를 cover로 맞출 때 스케일/오프셋
+let imgScale, imgOffX, imgOffY;
 
 function resize() {
-  W = bgC.width  = pgC.width  = flC.width  = window.innerWidth;
-  H = bgC.height = pgC.height = flC.height = window.innerHeight;
-
-  // 메인이미지2를 화면에 object-fit:cover로 맞출 때의 스케일/오프셋
-  const scaleX = W / ORIG_W;
-  const scaleY = H / ORIG_H;
-  scale = Math.max(scaleX, scaleY);
-  offX  = (W - ORIG_W * scale) / 2;
-  offY  = (H - ORIG_H * scale) / 2;
+  W = bgC.width = pgC.width = flC.width = window.innerWidth;
+  H = bgC.height= pgC.height= flC.height= window.innerHeight;
+  const sx = W/ORIG_W, sy = H/ORIG_H;
+  imgScale = Math.max(sx, sy);
+  imgOffX  = (W - ORIG_W*imgScale) / 2;
+  imgOffY  = (H - ORIG_H*imgScale) / 2;
 }
 resize();
-window.addEventListener('resize', () => { resize(); if(isBookOpen) renderAll(); });
+window.addEventListener('resize', ()=>{ resize(); if(isBookOpen&&!flipping) drawStatic(); });
 
-// ── 이미지 로드
-const bgImg    = new Image(); bgImg.src    = '메인이미지2.jpg'; bgImg.onload = renderAll;
-const leftMask = new Image(); leftMask.src = 'left_mask.png';  leftMask.onload = renderAll;
-const rightMask= new Image(); rightMask.src= 'right_mask.png'; rightMask.onload = renderAll;
-
-const pageImgs = PAGE_SRCS.map(src => {
-  const img = new Image(); img.src = src;
-  img.onload = () => { if(isBookOpen && !flipping) renderAll(); };
-  return img;
-});
-
-// ── 좌표 변환: 원본이미지 픽셀 → 화면 픽셀
-function toScreen(x, y, w, h) {
+// ── 원본 픽셀 → 화면 픽셀 변환
+function toScr(ox, oy, ow, oh) {
   return {
-    x: offX + x * scale,
-    y: offY + y * scale,
-    w: w * scale,
-    h: h * scale,
+    x: imgOffX + ox * imgScale,
+    y: imgOffY + oy * imgScale,
+    w: ow * imgScale,
+    h: oh * imgScale,
   };
 }
 
-// ══════════════════════════════════════════
-//  촛불 일렁임
-// ══════════════════════════════════════════
-const candles = [
-  { xR:0.32, yR:0.20, r:0.28, phase:0,   speed:0.0017 },
-  { xR:0.67, yR:0.16, r:0.25, phase:1.8, speed:0.0021 },
-];
+// ── 이미지 로드
+const bgImg     = loadImg('메인이미지2.jpg');
+const leftMask  = loadImg('left_mask.png');
+const rightMask = loadImg('right_mask.png');
+const allImgs   = {};
+SPREADS.forEach(([l,r]) => {
+  if(l) allImgs[l]=loadImg(l);
+  if(r) allImgs[r]=loadImg(r);
+});
 
-function flicker(t, phase, speed) {
-  return (
-    Math.sin(t*speed*1.00+phase)*0.40 +
-    Math.sin(t*speed*2.73+phase+0.5)*0.25 +
-    Math.sin(t*speed*5.17+phase+1.2)*0.15 +
-    Math.sin(t*speed*9.31+phase+2.1)*0.08 +
-    Math.sin(t*speed*17.6+phase+0.9)*0.04
-  ) / 0.92;
+function loadImg(src) {
+  const img = new Image();
+  img.src = src;
+  img.onload = ()=>{ if(isBookOpen&&!flipping) drawStatic(); };
+  return img;
 }
 
-function drawBackground(t) {
-  bgCtx.clearRect(0, 0, W, H);
+// ══════════════════════════════════════════
+//  마스크 합성 — 핵심 함수
+//  방식: 캔버스 전체 크기 오프스크린 사용
+//        마스크와 페이지를 같은 좌표계에서 합성
+// ══════════════════════════════════════════
+function compositePage(ctx, pageImg, region, mask) {
+  const s = toScr(region.x, region.y, region.w, region.h);
 
-  // 메인이미지2 (배경)
-  if (bgImg.complete && bgImg.naturalWidth > 0) {
-    bgCtx.drawImage(bgImg, offX, offY, ORIG_W*scale, ORIG_H*scale);
+  // [1] 오프스크린 = 화면 전체 크기
+  //     → 좌표계가 메인 캔버스와 완전히 동일
+  const off = new OffscreenCanvas(W, H);
+  const oc  = off.getContext('2d');
+
+  // [2] 마스크를 실제 위치/크기에 그림
+  if (mask.complete && mask.naturalWidth > 0) {
+    oc.drawImage(mask, s.x, s.y, s.w, s.h);
   } else {
-    bgCtx.fillStyle = '#1a0f05';
-    bgCtx.fillRect(0, 0, W, H);
+    oc.fillStyle = 'white';
+    oc.fillRect(s.x, s.y, s.w, s.h);
   }
 
-  // 어둠 오버레이
-  bgCtx.fillStyle = 'rgba(0,0,0,0.42)';
-  bgCtx.fillRect(0, 0, W, H);
-
-  // 촛불 빛
-  candles.forEach(c => {
-    const f  = flicker(t, c.phase, c.speed);
-    const cx = W * c.xR;
-    const cy = H * c.yR;
-    const r  = Math.min(W,H) * c.r * (1 + f*0.12);
-    const a  = 0.52 + f*0.18;
-    const gr = bgCtx.createRadialGradient(cx,cy,0, cx,cy,r);
-    gr.addColorStop(0,   `rgba(255,230,150,${a})`);
-    gr.addColorStop(0.2, `rgba(255,180,80,${a*0.55})`);
-    gr.addColorStop(0.5, `rgba(200,120,40,${a*0.22})`);
-    gr.addColorStop(1,   'rgba(0,0,0,0)');
-    bgCtx.globalCompositeOperation = 'screen';
-    bgCtx.fillStyle = gr;
-    bgCtx.fillRect(0, 0, W, H);
-    bgCtx.globalCompositeOperation = 'source-over';
-  });
-
-  // 비네팅
-  const vig = bgCtx.createRadialGradient(W/2,H/2, Math.min(W,H)*0.2, W/2,H/2, Math.max(W,H)*0.75);
-  vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, 'rgba(0,0,0,0.6)');
-  bgCtx.fillStyle = vig;
-  bgCtx.fillRect(0, 0, W, H);
-}
-
-// ══════════════════════════════════════════
-//  페이지 합성 (마스크 클리핑)
-// ══════════════════════════════════════════
-function drawPages(leftIdx, rightIdx) {
-  pgCtx.clearRect(0, 0, W, H);
-
-  // 왼쪽 페이지
-  drawOnePage(pgCtx, pageImgs[leftIdx], leftIdx, LEFT_PAGE, leftMask);
-  // 오른쪽 페이지
-  drawOnePage(pgCtx, pageImgs[rightIdx], rightIdx, RIGHT_PAGE, rightMask);
-}
-
-function drawOnePage(ctx, img, idx, region, mask) {
-  const s = toScreen(region.x, region.y, region.w, region.h);
-
-  // 오프스크린에 페이지 이미지 그리기
-  const off = document.createElement('canvas');
-  off.width = s.w; off.height = s.h;
-  const oc = off.getContext('2d');
-
-  if (img && img.complete && img.naturalWidth > 0) {
-    oc.drawImage(img, 0, 0, s.w, s.h);
+  // [3] 마스크 흰 부분에만 페이지 이미지 합성
+  oc.globalCompositeOperation = 'source-in';
+  if (pageImg && pageImg.complete && pageImg.naturalWidth > 0) {
+    oc.drawImage(pageImg, s.x, s.y, s.w, s.h);
   } else {
     // 플레이스홀더
-    const gr = oc.createLinearGradient(0,0,0,s.h);
+    const gr = oc.createLinearGradient(s.x, s.y, s.x, s.y+s.h);
     gr.addColorStop(0,'#f0e0c0'); gr.addColorStop(1,'#e0cc9a');
-    oc.fillStyle = gr; oc.fillRect(0,0,s.w,s.h);
-    for(let ly=28; ly<s.h; ly+=28){
-      oc.strokeStyle='rgba(139,90,43,0.1)'; oc.lineWidth=0.8;
-      oc.beginPath(); oc.moveTo(0,ly); oc.lineTo(s.w,ly); oc.stroke();
-    }
-    oc.fillStyle='rgba(100,60,20,0.2)';
-    oc.font=`bold ${s.h*0.18}px serif`;
+    oc.fillStyle=gr; oc.fillRect(s.x, s.y, s.w, s.h);
+    oc.fillStyle='rgba(100,60,20,0.25)';
+    oc.font=`bold ${s.h*0.1}px serif`;
     oc.textAlign='center'; oc.textBaseline='middle';
-    oc.fillText(PAGE_SRCS[idx] || String(idx), s.w/2, s.h/2);
+    oc.fillText('이미지 준비 중', s.x+s.w/2, s.y+s.h/2);
   }
+  oc.globalCompositeOperation = 'source-over';
 
-  // 마스크 적용: destination-in
-  if (mask.complete && mask.naturalWidth > 0) {
-    oc.globalCompositeOperation = 'destination-in';
-    oc.drawImage(mask, 0, 0, s.w, s.h);
-    oc.globalCompositeOperation = 'source-over';
-  }
+  // [4] 제본 그림자
+  const isLeft = (region === L);
+  const sg = oc.createLinearGradient(
+    isLeft ? s.x+s.w : s.x, s.y,
+    isLeft ? s.x+s.w*0.82 : s.x+s.w*0.18, s.y
+  );
+  sg.addColorStop(0,'rgba(0,0,0,0.2)'); sg.addColorStop(1,'rgba(0,0,0,0)');
+  oc.fillStyle=sg; oc.fillRect(s.x, s.y, s.w, s.h);
 
-  // 종이 질감 오버레이 (제본 그림자)
-  const sg = oc.createLinearGradient(0,0,s.w*0.15,0);
-  sg.addColorStop(0,'rgba(0,0,0,0.25)');
-  sg.addColorStop(1,'rgba(0,0,0,0)');
-  oc.fillStyle = sg; oc.fillRect(0,0,s.w,s.h);
-
-  ctx.drawImage(off, s.x, s.y);
+  // [5] 오프스크린 → 메인 캔버스 (같은 크기이므로 0,0에 붙이면 정확히 맞음)
+  ctx.drawImage(off, 0, 0);
 }
 
 // ══════════════════════════════════════════
-//  페이지 플립 애니메이션
+//  정적 렌더
 // ══════════════════════════════════════════
-let curSpread = 0;   // 현재 펼침 번호 (0 = 0,1번 페이지)
-let flipping  = false;
-let flipDir   = 1;
-let flipProg  = 0;
-let flipStart = 0;
+let curSpread = 0;
+
+function drawStatic() {
+  pgCtx.clearRect(0,0,W,H);
+  flCtx.clearRect(0,0,W,H);
+  const [lSrc, rSrc] = SPREADS[curSpread];
+  if(lSrc) compositePage(pgCtx, allImgs[lSrc], L, leftMask);
+  if(rSrc) compositePage(pgCtx, allImgs[rSrc], R, rightMask);
+}
+
+// ══════════════════════════════════════════
+//  페이지 플립
+// ══════════════════════════════════════════
+let flipping=false, flipDir=1, flipProg=0, flipStart=0;
 const FLIP_DUR = 650;
 
-function getPageIdx(spread, side) {
-  // side: 'left'|'right'
-  const base = spread * 2;
-  return side === 'left' ? base : base + 1;
-}
-
-function startFlip(dir) {
-  if (flipping) return;
-  if (dir ===  1 && curSpread >= TOTAL_SPREADS-1) return;
-  if (dir === -1 && curSpread <= 0) return;
-  flipDir  = dir;
-  flipProg = 0;
-  flipping = true;
-  flipStart= performance.now();
-}
-
 function drawFlip(progress) {
-  flCtx.clearRect(0, 0, W, H);
+  flCtx.clearRect(0,0,W,H);
 
-  // 넘어가는 쪽: 오른쪽 페이지가 넘어감 (다음으로 갈 때)
-  const fromSpread = flipDir === 1 ? curSpread     : curSpread-1;
-  const toSpread   = flipDir === 1 ? curSpread+1   : curSpread;
+  const fromSpread = flipDir===1 ? curSpread   : curSpread-1;
+  const toSpread   = flipDir===1 ? curSpread+1 : curSpread;
 
-  // 뒤에 깔릴 펼침 먼저
-  const toLI = getPageIdx(toSpread, 'left');
-  const toRI = getPageIdx(toSpread, 'right');
-  drawOnePage(flCtx, pageImgs[toLI], toLI, LEFT_PAGE,  leftMask);
-  drawOnePage(flCtx, pageImgs[toRI], toRI, RIGHT_PAGE, rightMask);
+  // 뒤에 깔릴 페이지
+  const [toLSrc,toRSrc] = SPREADS[toSpread];
+  if(toLSrc) compositePage(flCtx, allImgs[toLSrc], L, leftMask);
+  if(toRSrc) compositePage(flCtx, allImgs[toRSrc], R, rightMask);
 
-  // 넘어가는 페이지: 오른쪽 페이지 플립
-  const fromRI = getPageIdx(fromSpread, 'right');
-  drawFlipPage(flCtx, pageImgs[fromRI], fromRI, RIGHT_PAGE, rightMask, progress);
+  // 넘어가는 오른쪽 페이지
+  const [fromLSrc,fromRSrc] = SPREADS[fromSpread];
+  if(fromRSrc) drawFlipSlices(flCtx, allImgs[fromRSrc], R, rightMask, progress);
 
-  // 왼쪽은 그대로 (from)
-  const fromLI = getPageIdx(fromSpread, 'left');
-  drawOnePage(flCtx, pageImgs[fromLI], fromLI, LEFT_PAGE, leftMask);
+  // 왼쪽 덮기
+  if(fromLSrc) compositePage(flCtx, allImgs[fromLSrc], L, leftMask);
 }
 
-function drawFlipPage(ctx, img, idx, region, mask, progress) {
-  const s = toScreen(region.x, region.y, region.w, region.h);
-  const p = flipDir === 1 ? progress : 1-progress;
+function drawFlipSlices(ctx, pageImg, region, mask, progress) {
+  const s  = toScr(region.x, region.y, region.w, region.h);
+  const sw = Math.ceil(s.w), sh = Math.ceil(s.h);
+
+  const p    = flipDir===1 ? progress : 1-progress;
   const ease = p<0.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
   const foldX = 1-ease;
 
-  // 오프스크린에 원본 그리기
-  const off = document.createElement('canvas');
-  off.width = s.w; off.height = s.h;
-  const oc = off.getContext('2d');
-  if (img && img.complete && img.naturalWidth > 0) {
-    oc.drawImage(img, 0, 0, s.w, s.h);
-  } else {
-    const gr = oc.createLinearGradient(0,0,0,s.h);
-    gr.addColorStop(0,'#f0e0c0'); gr.addColorStop(1,'#e0cc9a');
-    oc.fillStyle=gr; oc.fillRect(0,0,s.w,s.h);
-  }
-  // 마스크 적용
-  if (mask.complete && mask.naturalWidth > 0) {
-    oc.globalCompositeOperation='destination-in';
-    oc.drawImage(mask, 0, 0, s.w, s.h);
-    oc.globalCompositeOperation='source-over';
-  }
+  // 마스크된 소스 오프스크린 (페이지 크기)
+  const src = new OffscreenCanvas(sw, sh);
+  const sc  = src.getContext('2d');
+  if (mask.complete && mask.naturalWidth>0)
+    sc.drawImage(mask, 0, 0, sw, sh);
+  else { sc.fillStyle='white'; sc.fillRect(0,0,sw,sh); }
+  sc.globalCompositeOperation='source-in';
+  if (pageImg && pageImg.complete && pageImg.naturalWidth>0)
+    sc.drawImage(pageImg, 0, 0, sw, sh);
+  else { sc.fillStyle='#e8d8b0'; sc.fillRect(0,0,sw,sh); }
+  sc.globalCompositeOperation='source-over';
 
-  // 슬라이스 플립
-  const SLICES = 60;
+  // 슬라이스
+  const SLICES=60;
   ctx.save();
-  for (let i=0; i<SLICES; i++) {
-    const t  = i/SLICES;
-    if (t >= foldX) continue;
-    const t1 = (i+1)/SLICES;
-    const xPos    = t * foldX;
-    const bendAmt = Math.sin(ease*Math.PI) * s.h * 0.05;
-    const yBend   = Math.sin(t*Math.PI) * bendAmt;
-    const hScale  = 1 - Math.abs(yBend)/s.h*0.04;
-    const shadow  = Math.min(0.5, ease*(1-t)*1.1);
-    const sx=t*s.w, sw=(t1-t)*s.w;
-    const dx=s.x+xPos*s.w, dw=sw*foldX;
-    const dy=s.y+yBend, dh=s.h*hScale;
-    if(dw<=0) continue;
-    ctx.drawImage(off, sx,0,sw,s.h, dx,dy, Math.max(0.5,dw), dh);
-    if(shadow>0.02){ ctx.fillStyle=`rgba(0,0,0,${shadow*0.6})`; ctx.fillRect(dx,dy,Math.max(0.5,dw),dh); }
-    const hl = Math.max(0, 0.12-Math.abs(t-foldX)*3)*(1-ease);
-    if(hl>0.01){ ctx.fillStyle=`rgba(255,240,190,${hl})`; ctx.fillRect(dx,dy,Math.max(0.5,dw),dh); }
+  for (let i=0;i<SLICES;i++) {
+    const t=i/SLICES;
+    if (t>=foldX) continue;
+    const t1=(i+1)/SLICES;
+    const xPos=t*foldX;
+    const bend=Math.sin(ease*Math.PI)*sh*0.05;
+    const yB=Math.sin(t*Math.PI)*bend;
+    const hSc=1-Math.abs(yB)/sh*0.04;
+    const shd=Math.min(0.5,ease*(1-t)*1.1);
+    const srcX=t*sw, srcW=(t1-t)*sw;
+    const dstX=s.x+xPos*s.w, dstW=srcW*foldX;
+    const dstY=s.y+yB, dstH=s.h*hSc;
+    if(dstW<=0) continue;
+    ctx.drawImage(src, srcX,0,srcW,sh, dstX,dstY, Math.max(0.5,dstW), dstH);
+    if(shd>0.02){ ctx.fillStyle=`rgba(0,0,0,${shd*0.6})`; ctx.fillRect(dstX,dstY,Math.max(0.5,dstW),dstH); }
+    const hl=Math.max(0,0.12-Math.abs(t-foldX)*3)*(1-ease);
+    if(hl>0.01){ ctx.fillStyle=`rgba(255,240,190,${hl})`; ctx.fillRect(dstX,dstY,Math.max(0.5,dstW),dstH); }
   }
   ctx.restore();
 
   // 뒷면
-  const backW = Math.min(s.w*(1-foldX)*0.25, s.w*0.12);
-  const backX = s.x+foldX*s.w;
+  const backW=Math.min(s.w*(1-foldX)*0.25,s.w*0.12);
+  const backX=s.x+foldX*s.w;
   if(backW>1){
     const bg2=ctx.createLinearGradient(backX,0,backX+backW,0);
     bg2.addColorStop(0,'rgba(200,170,110,0.45)');
@@ -391,37 +272,54 @@ function drawFlipPage(ctx, img, idx, region, mask, progress) {
   }
 }
 
-function renderStatic() {
-  pgCtx.clearRect(0,0,W,H);
-  flCtx.clearRect(0,0,W,H);
-  const li = getPageIdx(curSpread,'left');
-  const ri = getPageIdx(curSpread,'right');
-  drawPages(li, ri);
+// ══════════════════════════════════════════
+//  촛불
+// ══════════════════════════════════════════
+const candles=[
+  {xR:0.32,yR:0.20,r:0.28,phase:0,  speed:0.0017},
+  {xR:0.67,yR:0.16,r:0.25,phase:1.8,speed:0.0021},
+];
+function flicker(t,ph,sp){
+  return(Math.sin(t*sp*1.0+ph)*0.40+Math.sin(t*sp*2.73+ph+0.5)*0.25+
+         Math.sin(t*sp*5.17+ph+1.2)*0.15+Math.sin(t*sp*9.31+ph+2.1)*0.08+
+         Math.sin(t*sp*17.6+ph+0.9)*0.04)/0.92;
 }
-
-function renderAll() {
-  if(!isBookOpen) return;
-  if(!flipping) renderStatic();
+function drawBg(t){
+  bgCtx.clearRect(0,0,W,H);
+  if(bgImg.complete&&bgImg.naturalWidth>0)
+    bgCtx.drawImage(bgImg, imgOffX, imgOffY, ORIG_W*imgScale, ORIG_H*imgScale);
+  else{bgCtx.fillStyle='#1a0f05';bgCtx.fillRect(0,0,W,H);}
+  bgCtx.fillStyle='rgba(0,0,0,0.42)';bgCtx.fillRect(0,0,W,H);
+  candles.forEach(c=>{
+    const f=flicker(t,c.phase,c.speed),cx=W*c.xR,cy=H*c.yR;
+    const r=Math.min(W,H)*c.r*(1+f*0.12),a=0.52+f*0.18;
+    const gr=bgCtx.createRadialGradient(cx,cy,0,cx,cy,r);
+    gr.addColorStop(0,`rgba(255,230,150,${a})`);
+    gr.addColorStop(0.2,`rgba(255,180,80,${a*0.55})`);
+    gr.addColorStop(0.5,`rgba(200,120,40,${a*0.22})`);
+    gr.addColorStop(1,'rgba(0,0,0,0)');
+    bgCtx.globalCompositeOperation='screen';
+    bgCtx.fillStyle=gr;bgCtx.fillRect(0,0,W,H);
+    bgCtx.globalCompositeOperation='source-over';
+  });
+  const vig=bgCtx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.2,W/2,H/2,Math.max(W,H)*0.75);
+  vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,0,0.6)');
+  bgCtx.fillStyle=vig;bgCtx.fillRect(0,0,W,H);
 }
 
 // ══════════════════════════════════════════
 //  메인 루프
 // ══════════════════════════════════════════
-let isBookOpen = false;
-
-function loop(t) {
-  drawBackground(t);
-  if(isBookOpen) {
-    if(flipping) {
-      flipProg = Math.min((t-flipStart)/FLIP_DUR, 1);
-      drawFlip(flipProg);
-      if(flipProg>=1){
-        flipping=false;
-        if(flipDir===1) curSpread++;
-        else            curSpread--;
-        renderStatic();
-        updateUI();
-      }
+let isBookOpen=false;
+function loop(t){
+  drawBg(t);
+  if(isBookOpen&&flipping){
+    flipProg=Math.min((t-flipStart)/FLIP_DUR,1);
+    drawFlip(flipProg);
+    if(flipProg>=1){
+      flipping=false;
+      if(flipDir===1)curSpread++;else curSpread--;
+      drawStatic();updateUI();
     }
   }
   requestAnimationFrame(loop);
@@ -429,67 +327,59 @@ function loop(t) {
 requestAnimationFrame(loop);
 
 // ══════════════════════════════════════════
-//  인트로 → 책 열기
+//  인트로
 // ══════════════════════════════════════════
-const introEl   = document.getElementById('intro');
-const overlayEl = document.getElementById('open-overlay');
+const introEl=document.getElementById('intro');
+const overlayEl=document.getElementById('open-overlay');
 
-function openBook() {
-  if(isBookOpen) return;
-  isBookOpen = true;
-  introEl.style.transform = 'scale(1.18)';
-  introEl.style.opacity   = '0';
-  overlayEl.style.display = 'block';
-  overlayEl.style.transition = 'opacity 0.35s 0.5s ease';
-  overlayEl.style.opacity = '1';
+function openBook(){
+  if(isBookOpen)return;
+  isBookOpen=true;
+  introEl.style.transform='scale(1.18)';
+  introEl.style.opacity='0';
+  overlayEl.style.display='block';
+  overlayEl.style.transition='opacity 0.35s 0.5s ease';
+  overlayEl.style.opacity='1';
   setTimeout(()=>{
-    introEl.style.display = 'none';
-    overlayEl.style.transition = 'opacity 0.6s ease';
-    overlayEl.style.opacity = '0';
-    setTimeout(()=>{
-      overlayEl.style.display = 'none';
-      renderStatic();
-      updateUI();
-    }, 650);
-  }, 650);
+    introEl.style.display='none';
+    overlayEl.style.transition='opacity 0.6s ease';
+    overlayEl.style.opacity='0';
+    setTimeout(()=>{ overlayEl.style.display='none'; drawStatic();updateUI(); },650);
+  },650);
 }
 
-function updateUI() {
-  const goAR  = document.getElementById('go-ar');
-  const pgNum = document.getElementById('page-num');
-  pgNum.textContent = isBookOpen ? `${curSpread+1} / ${TOTAL_SPREADS}` : '';
-  if(curSpread >= TOTAL_SPREADS-1){
-    goAR.style.display='block'; pgNum.style.opacity='0';
-  } else {
-    goAR.style.display='none'; pgNum.style.opacity='1';
-  }
+function startFlip(dir){
+  if(flipping)return;
+  if(dir===1&&curSpread>=TOTAL_SPREADS-1)return;
+  if(dir===-1&&curSpread<=0)return;
+  flipDir=dir;flipProg=0;flipping=true;flipStart=performance.now();
 }
 
-// ══════════════════════════════════════════
-//  터치 / 클릭
-// ══════════════════════════════════════════
-let touchStartX = 0;
-const tl = document.getElementById('touch-layer');
+function updateUI(){
+  const goAR=document.getElementById('go-ar');
+  const pgNum=document.getElementById('page-num');
+  pgNum.textContent=`${curSpread+1} / ${TOTAL_SPREADS}`;
+  if(curSpread>=TOTAL_SPREADS-1){goAR.style.display='block';pgNum.style.opacity='0';}
+  else{goAR.style.display='none';pgNum.style.opacity='1';}
+}
 
-tl.addEventListener('touchstart', e=>{
-  touchStartX = e.touches[0].clientX;
-}, {passive:true});
-
-tl.addEventListener('touchend', e=>{
-  if(!isBookOpen){ openBook(); return; }
-  if(flipping) return;
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  if(Math.abs(dx)>30) startFlip(dx<0?1:-1);
-  else startFlip(e.changedTouches[0].clientX > W/2 ? 1 : -1);
+// 터치/클릭
+let touchStartX=0;
+const tl=document.getElementById('touch-layer');
+tl.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;},{passive:true});
+tl.addEventListener('touchend',e=>{
+  if(!isBookOpen){openBook();return;}
+  if(flipping)return;
+  const dx=e.changedTouches[0].clientX-touchStartX;
+  if(Math.abs(dx)>30)startFlip(dx<0?1:-1);
+  else startFlip(e.changedTouches[0].clientX>W/2?1:-1);
 },{passive:true});
-
-tl.addEventListener('click', e=>{
-  if(!isBookOpen){ openBook(); return; }
-  if(flipping) return;
-  startFlip(e.clientX > W/2 ? 1 : -1);
+tl.addEventListener('click',e=>{
+  if(!isBookOpen){openBook();return;}
+  if(flipping)return;
+  startFlip(e.clientX>W/2?1:-1);
 });
-
-introEl.addEventListener('click', ()=>{ if(!isBookOpen) openBook(); });
+introEl.addEventListener('click',()=>{if(!isBookOpen)openBook();});
 </script>
 </body>
 </html>
