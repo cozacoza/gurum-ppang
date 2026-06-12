@@ -12,17 +12,21 @@
     #page-canvas{ z-index:5;  pointer-events:none; }
     #flip-canvas{ z-index:10; pointer-events:none; }
     #touch-layer{ z-index:20; position:fixed; inset:0; cursor:pointer; pointer-events:none; }
-    #intro {
+    /* 표지 화면 */
+    #cover {
       position:fixed; inset:0; z-index:30; overflow:hidden;
-      transition: transform 0.9s cubic-bezier(0.4,0,0.2,1), opacity 0.7s 0.3s ease;
+      background:#000;
+      opacity:0;
+      transition: opacity 1.4s ease;
     }
-    #intro img { width:100%; height:100%; object-fit:cover; display:block; }
-    #intro-hint {
+    #cover img { width:100%; height:100%; object-fit:cover; display:block; }
+    #cover-hint {
       position:absolute; bottom:36px; left:50%; transform:translateX(-50%);
       color:rgba(255,220,140,0.75); font-size:15px; font-family:serif;
       letter-spacing:2px; white-space:nowrap;
       text-shadow:0 0 12px rgba(255,180,60,0.8);
       animation:hintPulse 2s ease-in-out infinite;
+      opacity:0; transition: opacity 0.8s 1.5s ease;
     }
     @keyframes hintPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
     #open-overlay { display:none; position:fixed; inset:0; z-index:35; background:#0a0704; opacity:0; }
@@ -50,9 +54,9 @@
 <canvas id="page-canvas"></canvas>
 <canvas id="flip-canvas"></canvas>
 <div id="touch-layer"></div>
-<div id="intro">
-  <img src="main1.png" alt="표지"/>
-  <div id="intro-hint">터치하면 책이 열려요</div>
+<div id="cover">
+  <img src="cover.png" alt="표지"/>
+  <div id="cover-hint">오른쪽을 터치하면 책이 열려요</div>
 </div>
 <div id="open-overlay"></div>
 <button id="go-ar" onclick="location.href='ar.html'">☁ 구름 따러 가기</button>
@@ -62,7 +66,6 @@
 // ★ 페이지 설정
 // null = 해당 쪽 비움 (배경만 보임)
 const SPREADS = [
-  [null,             'page0_right.png'],  // 표지: 오른쪽만
   ['page1_left.png', 'page1_right.png'],
   ['page2_left.png', 'page2_right.png'],
   ['page3_left.png', 'page3_right.png'],
@@ -289,34 +292,47 @@ function loop(t){
 }
 requestAnimationFrame(loop);
 
+// 페이지 로드 후 표지 페이드인 (검은화면 → 밝아짐)
+window.addEventListener('load', ()=>{
+  const coverEl = document.getElementById('cover');
+  // 살짝 딜레이 후 페이드인
+  setTimeout(()=>{
+    coverEl.style.opacity = '1';
+    // 힌트도 함께 등장
+    setTimeout(()=>{
+      document.getElementById('cover-hint').style.opacity = '1';
+    }, 1500);
+  }, 300);
+});
+
 // ══════════════════════════════════════════
 //  인트로
 // ══════════════════════════════════════════
-const introEl=document.getElementById('intro');
+// cover는 openBook 안에서 직접 참조
 const overlayEl=document.getElementById('open-overlay');
 
 function openBook(){
   if(isBookOpen)return;
   isBookOpen=true;
 
-  // touch-layer 활성화 (이제부터 페이지 터치 받음)
+  // touch-layer 활성화
   document.getElementById('touch-layer').style.pointerEvents='auto';
 
-  // 1) main1 줌인 + 페이드아웃
-  introEl.style.transition='transform 1.1s cubic-bezier(0.4,0,0.2,1), opacity 0.6s 0.5s ease';
-  introEl.style.transform='scale(1.35)';
-  introEl.style.opacity='0';
+  // 1) 표지 줌인 + 페이드아웃
+  const coverEl = document.getElementById('cover');
+  coverEl.style.transition='transform 1.0s cubic-bezier(0.4,0,0.2,1), opacity 0.6s 0.4s ease';
+  coverEl.style.transform='scale(1.35)';
+  coverEl.style.opacity='0';
 
-  // 2) 검은 오버레이 등장
+  // 2) 검은 오버레이
   overlayEl.style.display='block';
-  overlayEl.style.transition='opacity 0.4s 0.6s ease';
+  overlayEl.style.transition='opacity 0.4s 0.5s ease';
   overlayEl.style.opacity='1';
 
   setTimeout(()=>{
-    introEl.style.display='none';
+    coverEl.style.display='none';
 
-    // 3) bg-canvas(main2)를 줌인 상태로 시작해서 원래 크기로 돌아오는 효과
-    //    → bgCanvas에 scale 애니메이션 적용
+    // 3) main2 줌인→줌아웃 효과
     zoomInBg();
 
     // 4) 오버레이 사라짐
@@ -326,10 +342,10 @@ function openBook(){
       overlayEl.style.display='none';
       drawStatic(); updateUI();
     }, 700);
-  }, 900);
+  }, 800);
 }
 
-// main2 클로즈업 → 원래 크기로 줌아웃 (Canvas transform)
+// main2 클로즈업 → 원래 크기로 줌아웃
 let bgZoom = 1.35;
 function zoomInBg(){
   bgZoom = 1.35;
@@ -338,7 +354,6 @@ function zoomInBg(){
   function step(t){
     const elapsed = t - startTime;
     const prog = Math.min(elapsed/dur, 1);
-    // ease out
     const ease = 1 - Math.pow(1-prog, 3);
     bgZoom = 1.35 - 0.35*ease;
     if(prog < 1) requestAnimationFrame(step);
@@ -378,7 +393,7 @@ tl.addEventListener('click',e=>{
   if(flipping)return;
   startFlip(e.clientX>W/2?1:-1);
 });
-introEl.addEventListener('click',()=>{if(!isBookOpen)openBook();});
+document.getElementById('cover').addEventListener('click',()=>{if(!isBookOpen)openBook();});
 </script>
 </body>
 </html>
