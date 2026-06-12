@@ -11,15 +11,16 @@
     #main-canvas { z-index:0; }
     #page-canvas { z-index:5;  pointer-events:none; }
     #flip-canvas { z-index:10; pointer-events:none; }
-    #touch-layer { z-index:20; position:fixed; inset:0; }
+    #touch-layer { z-index:20; position:fixed; inset:0; pointer-events:none; }
     #hint {
-      position:fixed; bottom:36px; left:50%; transform:translateX(-50%);
-      color:rgba(255,220,140,0); font-size:15px; font-family:serif;
-      letter-spacing:2px; white-space:nowrap;
+      position:fixed; bottom:36px; left:50%;
+      transform:translateX(-50%);
+      color:rgba(255,220,140,0);
+      font-size:15px; font-family:serif; letter-spacing:2px;
+      white-space:nowrap; pointer-events:none; z-index:30;
       text-shadow:0 0 12px rgba(255,180,60,0.8);
-      pointer-events:none; z-index:30;
-      transition: color 1s ease;
-      animation: hintPulse 2s ease-in-out infinite;
+      animation:hintPulse 2s ease-in-out infinite;
+      transition:color 0.8s ease;
     }
     @keyframes hintPulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
     #go-ar {
@@ -35,7 +36,8 @@
       50%    { box-shadow:0 0 30px rgba(60,180,60,0.7); }
     }
     #page-num {
-      position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+      position:fixed; bottom:14px; left:50%;
+      transform:translateX(-50%);
       color:rgba(255,200,100,0.3); font-size:12px; font-family:serif;
       letter-spacing:2px; pointer-events:none; z-index:30;
     }
@@ -52,7 +54,7 @@
 
 <script>
 // ════════════════════════════════════════
-//  페이지 설정
+//  설정
 // ════════════════════════════════════════
 const SPREADS = [
   ['page1_left.png', 'page1_right.png'],
@@ -63,26 +65,23 @@ const SPREADS = [
   ['page6_left.png', 'page6_right.png'],
 ];
 const TOTAL_SPREADS = SPREADS.length;
-
-// 메인이미지2 원본 크기
 const ORIG_W = 1088, ORIG_H = 645;
-
-// 페이지 영역 (메인이미지2 원본 픽셀)
 const L = { x:200, y:101, w:348, h:498 };
 const R = { x:543, y:94,  w:377, h:507 };
 
 // ════════════════════════════════════════
 //  캔버스
 // ════════════════════════════════════════
-const mc = document.getElementById('main-canvas');
+const mc   = document.getElementById('main-canvas');
 const mCtx = mc.getContext('2d');
-const pc = document.getElementById('page-canvas');
+const pc   = document.getElementById('page-canvas');
 const pCtx = pc.getContext('2d');
-const fc = document.getElementById('flip-canvas');
+const fc   = document.getElementById('flip-canvas');
 const fCtx = fc.getContext('2d');
+const tl   = document.getElementById('touch-layer');
+const hint = document.getElementById('hint');
 
 let W, H, imgScale, imgOffX, imgOffY;
-
 function resize() {
   W = mc.width = pc.width = fc.width = window.innerWidth;
   H = mc.height= pc.height= fc.height= window.innerHeight;
@@ -94,26 +93,44 @@ function resize() {
 resize();
 window.addEventListener('resize', () => { resize(); if(phase==='book') drawStatic(); });
 
-// ════════════════════════════════════════
-//  이미지 로드
-// ════════════════════════════════════════
-function loadImg(src) {
-  const img = new Image();
-  img.src = src;
-  return img;
+function toScr(r) {
+  return { x:imgOffX+r.x*imgScale, y:imgOffY+r.y*imgScale,
+           w:r.w*imgScale, h:r.h*imgScale };
 }
-const coverImg = loadImg('cover.png');
-const bgImg    = loadImg('main2.jpg');
+
+// ════════════════════════════════════════
+//  이미지 로드 — 모두 로드 후 시작
+// ════════════════════════════════════════
+const coverImg = new Image(); coverImg.src = 'cover.png';
+const bgImg    = new Image(); bgImg.src    = 'main2.jpg';
 const pageImgs = {};
 SPREADS.forEach(([l,r]) => {
-  pageImgs[l] = loadImg(l);
-  pageImgs[r] = loadImg(r);
+  const li = new Image(); li.src = l; pageImgs[l] = li;
+  const ri = new Image(); ri.src = r; pageImgs[r] = ri;
 });
 
-function toScr(ox, oy, ow, oh) {
-  return { x: imgOffX+ox*imgScale, y: imgOffY+oy*imgScale,
-           w: ow*imgScale, h: oh*imgScale };
+// cover와 bg가 로드되면 시퀀스 시작
+let coverReady = false, bgReady = false;
+coverImg.onload = () => { coverReady = true; tryStart(); };
+bgImg.onload    = () => { bgReady    = true; tryStart(); };
+// 로드 실패해도 시작 (플레이스홀더로)
+coverImg.onerror = () => { coverReady = true; tryStart(); };
+bgImg.onerror    = () => { bgReady    = true; tryStart(); };
+
+function tryStart() {
+  if (coverReady && bgReady) startSequence();
 }
+
+// ════════════════════════════════════════
+//  상태
+//  phase: 'black' → 'fadein' → 'cover' → 'opening' → 'book'
+// ════════════════════════════════════════
+let phase       = 'black';
+let fadeStart   = 0;    // fadein 시작 타임스탬프
+const FADE_DUR  = 2200; // ms
+let openStart   = 0;
+const OPEN_DUR  = 800;
+let bgZoom      = 1;
 
 // ════════════════════════════════════════
 //  촛불
@@ -127,275 +144,217 @@ function flicker(t, ph, sp) {
           Math.sin(t*sp*5.17+ph+1.2)*0.15 + Math.sin(t*sp*9.31+ph+2.1)*0.08 +
           Math.sin(t*sp*17.6+ph+0.9)*0.04) / 0.92;
 }
+function drawCandles(t) {
+  mCtx.fillStyle = 'rgba(0,0,0,0.42)'; mCtx.fillRect(0,0,W,H);
+  candles.forEach(c => {
+    const f=flicker(t,c.phase,c.speed), cx=W*c.xR, cy=H*c.yR;
+    const r=Math.min(W,H)*c.r*(1+f*0.12), a=0.52+f*0.18;
+    const gr=mCtx.createRadialGradient(cx,cy,0,cx,cy,r);
+    gr.addColorStop(0,`rgba(255,230,150,${a})`);
+    gr.addColorStop(0.2,`rgba(255,180,80,${a*0.55})`);
+    gr.addColorStop(0.5,`rgba(200,120,40,${a*0.22})`);
+    gr.addColorStop(1,'rgba(0,0,0,0)');
+    mCtx.globalCompositeOperation='screen';
+    mCtx.fillStyle=gr; mCtx.fillRect(0,0,W,H);
+    mCtx.globalCompositeOperation='source-over';
+  });
+  const vig=mCtx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.2,W/2,H/2,Math.max(W,H)*0.75);
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.6)');
+  mCtx.fillStyle=vig; mCtx.fillRect(0,0,W,H);
+}
+function drawBg(zoom) {
+  const z=zoom||1, zW=ORIG_W*imgScale*z, zH=ORIG_H*imgScale*z;
+  const zX=imgOffX-(zW-ORIG_W*imgScale)/2, zY=imgOffY-(zH-ORIG_H*imgScale)/2;
+  mCtx.drawImage(bgImg, zX, zY, zW, zH);
+}
 
 // ════════════════════════════════════════
-//  상태 관리
-//  phase: 'black' → 'cover' → 'book'
+//  메인 루프 — 단 하나의 rAF 루프
 // ════════════════════════════════════════
-let phase = 'black';
-let coverAlpha = 0;   // cover 페이드인 진행 (0→1)
-let bgZoom = 1;       // book 진입시 줌아웃 효과
-
-// ── 메인 루프
-function loop(timestamp) {
-  mCtx.clearRect(0, 0, W, H);
+function loop(ts) {
+  mCtx.clearRect(0,0,W,H);
 
   if (phase === 'black') {
-    // 순수 검은 화면
-    mCtx.fillStyle = '#000';
-    mCtx.fillRect(0, 0, W, H);
+    mCtx.fillStyle='#000'; mCtx.fillRect(0,0,W,H);
 
-  } else if (phase === 'cover') {
-    // 검은 배경 위에 cover 페이드인
-    mCtx.fillStyle = '#000';
-    mCtx.fillRect(0, 0, W, H);
-    if (coverImg.complete && coverImg.naturalWidth > 0) {
-      mCtx.globalAlpha = coverAlpha;
+  } else if (phase === 'fadein') {
+    // 검은 배경 → cover 점점 밝아짐
+    const alpha = Math.min((ts - fadeStart) / FADE_DUR, 1);
+    mCtx.fillStyle='#000'; mCtx.fillRect(0,0,W,H);
+    if (coverImg.naturalWidth > 0) {
+      mCtx.globalAlpha = alpha;
       mCtx.drawImage(coverImg, 0, 0, W, H);
       mCtx.globalAlpha = 1;
     }
-
-  } else {
-    // book: main2 + 촛불
-    if (bgImg.complete && bgImg.naturalWidth > 0) {
-      const z  = bgZoom;
-      const zW = ORIG_W * imgScale * z;
-      const zH = ORIG_H * imgScale * z;
-      const zX = imgOffX - (zW - ORIG_W*imgScale) / 2;
-      const zY = imgOffY - (zH - ORIG_H*imgScale) / 2;
-      mCtx.drawImage(bgImg, zX, zY, zW, zH);
-    } else {
-      mCtx.fillStyle = '#1a0f05';
-      mCtx.fillRect(0, 0, W, H);
+    // 완전히 밝아지면 cover 단계로
+    if (alpha >= 1) {
+      phase = 'cover';
+      hint.style.color = 'rgba(255,220,140,0.75)';
+      setTimeout(() => { tl.style.pointerEvents = 'auto'; }, 600);
     }
-    mCtx.fillStyle = 'rgba(0,0,0,0.42)';
-    mCtx.fillRect(0, 0, W, H);
-    candles.forEach(c => {
-      const f = flicker(timestamp, c.phase, c.speed);
-      const cx = W*c.xR, cy = H*c.yR;
-      const r  = Math.min(W,H)*c.r*(1+f*0.12);
-      const a  = 0.52+f*0.18;
-      const gr = mCtx.createRadialGradient(cx,cy,0,cx,cy,r);
-      gr.addColorStop(0,   `rgba(255,230,150,${a})`);
-      gr.addColorStop(0.2, `rgba(255,180,80,${a*0.55})`);
-      gr.addColorStop(0.5, `rgba(200,120,40,${a*0.22})`);
-      gr.addColorStop(1,   'rgba(0,0,0,0)');
-      mCtx.globalCompositeOperation = 'screen';
-      mCtx.fillStyle = gr;
-      mCtx.fillRect(0, 0, W, H);
-      mCtx.globalCompositeOperation = 'source-over';
-    });
-    const vig = mCtx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.2,W/2,H/2,Math.max(W,H)*0.75);
-    vig.addColorStop(0, 'rgba(0,0,0,0)');
-    vig.addColorStop(1, 'rgba(0,0,0,0.6)');
-    mCtx.fillStyle = vig;
-    mCtx.fillRect(0, 0, W, H);
+
+  } else if (phase === 'cover') {
+    // cover 완전히 보임
+    mCtx.fillStyle='#000'; mCtx.fillRect(0,0,W,H);
+    if (coverImg.naturalWidth > 0) {
+      mCtx.drawImage(coverImg, 0, 0, W, H);
+    }
+
+  } else if (phase === 'opening') {
+    // cover → book 전환: 검은화면 → main2 줌아웃 등장
+    const p    = Math.min((ts - openStart) / OPEN_DUR, 1);
+    const ease = 1 - Math.pow(1-p, 3);
+    const zoom = 1.3 - 0.3*ease;
+    if (bgImg.naturalWidth > 0) {
+      drawBg(zoom);
+    } else {
+      mCtx.fillStyle='#1a0f05'; mCtx.fillRect(0,0,W,H);
+    }
+    drawCandles(ts);
+    if (p >= 1) {
+      phase = 'book';
+      drawStatic();
+      updateUI();
+      tl.style.pointerEvents = 'auto';
+    }
+
+  } else if (phase === 'book') {
+    if (bgImg.naturalWidth > 0) drawBg(1);
+    else { mCtx.fillStyle='#1a0f05'; mCtx.fillRect(0,0,W,H); }
+    drawCandles(ts);
   }
 
   requestAnimationFrame(loop);
 }
+
+// ════════════════════════════════════════
+//  시퀀스 시작 (cover + bg 로드 후)
+// ════════════════════════════════════════
+function startSequence() {
+  // 0.5초 검은화면 유지 후 fadein 시작
+  setTimeout(() => {
+    fadeStart = performance.now();
+    phase = 'fadein';
+  }, 500);
+}
+
+// rAF 루프 시작
 requestAnimationFrame(loop);
 
 // ════════════════════════════════════════
-//  시퀀스: black → cover (자동, 터치 없음)
-// ════════════════════════════════════════
-window.addEventListener('load', () => {
-  // 터치 완전 차단
-  document.getElementById('touch-layer').style.pointerEvents = 'none';
-
-  // 0.5초 후 cover 페이드인 시작
-  setTimeout(() => {
-    phase = 'cover';
-    const start = performance.now();
-    const dur   = 2200; // 2.2초에 걸쳐 밝아짐
-
-    function fadeStep(now) {
-      coverAlpha = Math.min((now - start) / dur, 1);
-      if (coverAlpha < 1) {
-        requestAnimationFrame(fadeStep);
-      } else {
-        // 완전히 밝아짐 → 힌트 표시 → 터치 활성화
-        coverAlpha = 1;
-        document.getElementById('hint').style.color = 'rgba(255,220,140,0.75)';
-        setTimeout(() => {
-          document.getElementById('touch-layer').style.pointerEvents = 'auto';
-        }, 600);
-      }
-    }
-    requestAnimationFrame(fadeStep);
-  }, 500);
-});
-
-// ════════════════════════════════════════
-//  cover → book 전환 (터치)
+//  cover → book
 // ════════════════════════════════════════
 function goToBook() {
-  phase = 'book';
-  document.getElementById('hint').style.color = 'rgba(255,220,140,0)';
-  document.getElementById('touch-layer').style.pointerEvents = 'none';
-
-  // main2 줌인→줌아웃
-  bgZoom = 1.3;
-  const start = performance.now();
-  const dur   = 900;
-  function zoomStep(now) {
-    const p = Math.min((now - start) / dur, 1);
-    const ease = 1 - Math.pow(1-p, 3);
-    bgZoom = 1.3 - 0.3*ease;
-    if (p < 1) requestAnimationFrame(zoomStep);
-    else {
-      bgZoom = 1;
-      drawStatic();
-      updateUI();
-      document.getElementById('touch-layer').style.pointerEvents = 'auto';
-    }
-  }
-  requestAnimationFrame(zoomStep);
+  if (phase !== 'cover') return;
+  tl.style.pointerEvents = 'none';
+  hint.style.color = 'rgba(255,220,140,0)';
+  openStart = performance.now();
+  phase = 'opening';
 }
 
 // ════════════════════════════════════════
 //  페이지 그리기
 // ════════════════════════════════════════
 let curSpread = 0;
-
 function drawPage(ctx, src, region) {
-  const s   = toScr(region.x, region.y, region.w, region.h);
+  const s = toScr(region);
   const img = pageImgs[src];
-  if (img && img.complete && img.naturalWidth > 0) {
+  if (img && img.complete && img.naturalWidth > 0)
     ctx.drawImage(img, s.x, s.y, s.w, s.h);
-  }
 }
-
 function drawStatic() {
-  pCtx.clearRect(0, 0, W, H);
-  fCtx.clearRect(0, 0, W, H);
-  const [lSrc, rSrc] = SPREADS[curSpread];
-  drawPage(pCtx, lSrc, L);
-  drawPage(pCtx, rSrc, R);
+  pCtx.clearRect(0,0,W,H);
+  fCtx.clearRect(0,0,W,H);
+  drawPage(pCtx, SPREADS[curSpread][0], L);
+  drawPage(pCtx, SPREADS[curSpread][1], R);
 }
 
 // ════════════════════════════════════════
 //  페이지 플립
 // ════════════════════════════════════════
-let flipping = false, flipDir = 1, flipProg = 0, flipStart = 0;
-const FLIP_DUR = 650;
+let flipping=false, flipDir=1, flipStart2=0;
+const FLIP_DUR=650;
 
 function startFlip(dir) {
-  if (flipping) return;
-  if (dir === 1  && curSpread >= TOTAL_SPREADS-1) return;
-  if (dir === -1 && curSpread <= 0) return;
-  flipDir=dir; flipProg=0; flipping=true; flipStart=performance.now();
+  if(flipping) return;
+  if(dir===1  && curSpread>=TOTAL_SPREADS-1) return;
+  if(dir===-1 && curSpread<=0) return;
+  flipDir=dir; flipping=true; flipStart2=performance.now();
   doFlip();
 }
-
 function doFlip() {
-  if (!flipping) return;
-  flipProg = Math.min((performance.now()-flipStart)/FLIP_DUR, 1);
-  drawFlipFrame(flipProg);
-  if (flipProg < 1) requestAnimationFrame(doFlip);
+  const prog = Math.min((performance.now()-flipStart2)/FLIP_DUR, 1);
+  fCtx.clearRect(0,0,W,H);
+  const from=flipDir===1?curSpread:curSpread-1;
+  const to  =flipDir===1?curSpread+1:curSpread;
+  drawPage(fCtx,SPREADS[to][0],L);
+  drawPage(fCtx,SPREADS[to][1],R);
+  flipSlices(fCtx,pageImgs[SPREADS[from][1]],R,prog);
+  drawPage(fCtx,SPREADS[from][0],L);
+  if(prog<1) requestAnimationFrame(doFlip);
   else {
-    flipping = false;
-    if (flipDir===1) curSpread++; else curSpread--;
+    flipping=false;
+    if(flipDir===1)curSpread++;else curSpread--;
     drawStatic(); updateUI();
   }
 }
-
-function drawFlipFrame(progress) {
-  fCtx.clearRect(0, 0, W, H);
-  const from = flipDir===1 ? curSpread   : curSpread-1;
-  const to   = flipDir===1 ? curSpread+1 : curSpread;
-
-  // 뒤에 깔릴 페이지
-  drawPage(fCtx, SPREADS[to][0], L);
-  drawPage(fCtx, SPREADS[to][1], R);
-
-  // 넘어가는 오른쪽 페이지
-  const rSrc = SPREADS[from][1];
-  const rImg = pageImgs[rSrc];
-  flipSlices(fCtx, rImg, R, progress);
-
-  // 왼쪽 덮기
-  drawPage(fCtx, SPREADS[from][0], L);
-}
-
-function flipSlices(ctx, img, region, progress) {
-  const s  = toScr(region.x, region.y, region.w, region.h);
-  const sw = Math.ceil(s.w), sh = Math.ceil(s.h);
-  const p  = flipDir===1 ? progress : 1-progress;
-  const ease = p<0.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
-  const foldX = 1-ease;
-
-  const tmp = document.createElement('canvas');
+function flipSlices(ctx,img,region,progress) {
+  const s=toScr(region), sw=Math.ceil(s.w), sh=Math.ceil(s.h);
+  const p=flipDir===1?progress:1-progress;
+  const ease=p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+  const foldX=1-ease;
+  const tmp=document.createElement('canvas');
   tmp.width=sw; tmp.height=sh;
-  const tc = tmp.getContext('2d');
-  if (img && img.complete && img.naturalWidth>0)
-    tc.drawImage(img, 0, 0, sw, sh);
-
-  const SLICES = 60;
+  const tc=tmp.getContext('2d');
+  if(img&&img.complete&&img.naturalWidth>0) tc.drawImage(img,0,0,sw,sh);
   ctx.save();
-  for (let i=0; i<SLICES; i++) {
-    const t=i/SLICES;
-    if (t>=foldX) continue;
-    const t1=(i+1)/SLICES;
-    const xPos=t*foldX;
+  for(let i=0;i<60;i++){
+    const t=i/60; if(t>=foldX)continue;
+    const t1=(i+1)/60, xPos=t*foldX;
     const bend=Math.sin(ease*Math.PI)*sh*0.05;
-    const yB=Math.sin(t*Math.PI)*bend;
-    const hSc=1-Math.abs(yB)/sh*0.04;
+    const yB=Math.sin(t*Math.PI)*bend, hSc=1-Math.abs(yB)/sh*0.04;
     const shd=Math.min(0.5,ease*(1-t)*1.1);
-    const srcX=t*sw, srcW=(t1-t)*sw;
-    const dstX=s.x+xPos*s.w, dstW=srcW*foldX;
-    const dstY=s.y+yB, dstH=s.h*hSc;
-    if(dstW<=0) continue;
-    ctx.drawImage(tmp, srcX,0,srcW,sh, dstX,dstY, Math.max(0.5,dstW), dstH);
-    if(shd>0.02){ ctx.fillStyle=`rgba(0,0,0,${shd*0.6})`; ctx.fillRect(dstX,dstY,Math.max(0.5,dstW),dstH); }
+    const sX=t*sw,sW=(t1-t)*sw,dX=s.x+xPos*s.w,dW=sW*foldX,dY=s.y+yB,dH=s.h*hSc;
+    if(dW<=0)continue;
+    ctx.drawImage(tmp,sX,0,sW,sh,dX,dY,Math.max(0.5,dW),dH);
+    if(shd>0.02){ctx.fillStyle=`rgba(0,0,0,${shd*0.6})`;ctx.fillRect(dX,dY,Math.max(0.5,dW),dH);}
     const hl=Math.max(0,0.12-Math.abs(t-foldX)*3)*(1-ease);
-    if(hl>0.01){ ctx.fillStyle=`rgba(255,240,190,${hl})`; ctx.fillRect(dstX,dstY,Math.max(0.5,dstW),dstH); }
+    if(hl>0.01){ctx.fillStyle=`rgba(255,240,190,${hl})`;ctx.fillRect(dX,dY,Math.max(0.5,dW),dH);}
   }
   ctx.restore();
-
-  const backW=Math.min(s.w*(1-foldX)*0.25,s.w*0.12);
-  const backX=s.x+foldX*s.w;
-  if(backW>1){
-    const bg=ctx.createLinearGradient(backX,0,backX+backW,0);
+  const bW=Math.min(s.w*(1-foldX)*0.25,s.w*0.12), bX=s.x+foldX*s.w;
+  if(bW>1){
+    const bg=ctx.createLinearGradient(bX,0,bX+bW,0);
     bg.addColorStop(0,'rgba(200,170,110,0.45)');
     bg.addColorStop(1,'rgba(180,150,90,0.05)');
-    ctx.fillStyle=bg; ctx.fillRect(backX,s.y,backW,s.h);
+    ctx.fillStyle=bg; ctx.fillRect(bX,s.y,bW,s.h);
   }
 }
 
 // ════════════════════════════════════════
-//  UI
+//  UI & 터치
 // ════════════════════════════════════════
 function updateUI() {
-  const goAR  = document.getElementById('go-ar');
-  const pgNum = document.getElementById('page-num');
-  pgNum.textContent = `${curSpread+1} / ${TOTAL_SPREADS}`;
-  if (curSpread >= TOTAL_SPREADS-1) { goAR.style.display='block'; pgNum.style.display='none'; }
-  else { goAR.style.display='none'; pgNum.style.display='block'; }
+  const goAR=document.getElementById('go-ar');
+  const pgNum=document.getElementById('page-num');
+  pgNum.textContent=`${curSpread+1} / ${TOTAL_SPREADS}`;
+  if(curSpread>=TOTAL_SPREADS-1){goAR.style.display='block';pgNum.style.display='none';}
+  else{goAR.style.display='none';pgNum.style.display='block';}
 }
 
-// ════════════════════════════════════════
-//  터치 / 클릭
-// ════════════════════════════════════════
-let touchStartX = 0;
-const tl = document.getElementById('touch-layer');
-
-tl.addEventListener('touchstart', e => {
-  touchStartX = e.touches[0].clientX;
-}, { passive:true });
-
-tl.addEventListener('touchend', e => {
-  if (phase === 'cover') { goToBook(); return; }
-  if (phase !== 'book' || flipping) return;
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  if (Math.abs(dx) > 30) startFlip(dx < 0 ? 1 : -1);
-  else startFlip(e.changedTouches[0].clientX > W/2 ? 1 : -1);
-}, { passive:true });
-
-tl.addEventListener('click', e => {
-  if (phase === 'cover') { goToBook(); return; }
-  if (phase !== 'book' || flipping) return;
-  startFlip(e.clientX > W/2 ? 1 : -1);
+let touchStartX=0;
+tl.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;},{passive:true});
+tl.addEventListener('touchend',e=>{
+  if(phase==='cover'){goToBook();return;}
+  if(phase!=='book'||flipping)return;
+  const dx=e.changedTouches[0].clientX-touchStartX;
+  if(Math.abs(dx)>30)startFlip(dx<0?1:-1);
+  else startFlip(e.changedTouches[0].clientX>W/2?1:-1);
+},{passive:true});
+tl.addEventListener('click',e=>{
+  if(phase==='cover'){goToBook();return;}
+  if(phase!=='book'||flipping)return;
+  startFlip(e.clientX>W/2?1:-1);
 });
 </script>
 </body>
