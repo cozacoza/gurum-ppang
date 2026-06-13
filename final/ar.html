@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>구름빵 AR</title>
+  <title>구름빵 AR — 구름 따기</title>
 
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.0/aframe/build/aframe-ar.js"></script>
@@ -121,7 +121,7 @@
 
   <a-entity
     id="cloud-entity"
-    gps-new-entity-place="latitude: 37.638141; longitude: 127.025789">
+    gps-new-entity-place="latitude: 37.6522723; longitude: 127.0148908">
 
     <a-entity
       id="cloud-inner"
@@ -153,13 +153,8 @@
 </a-scene>
 
 <script>
-  const arStage = sessionStorage.getItem('arStage') || 'first';
-  if (arStage === 'second') {
-    document.getElementById('catch-btn').textContent = '☁ 구름빵 만들기!';
-  }
-
-  const TARGET_LAT = 37.638141;
-  const TARGET_LNG = 127.025789;
+  const TARGET_LAT = 37.6522723;
+  const TARGET_LNG = 127.0148908;
   const CATCH_RADIUS = 15;
   const VISIBLE_RADIUS = 80;
 
@@ -170,7 +165,6 @@
 
   // iOS DeviceOrientation 권한 요청 — 반드시 버튼 클릭으로 호출
   async function requestPermissions() {
-    // iOS 13+ 방향 센서 권한
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
       try {
@@ -184,7 +178,6 @@
       }
     }
 
-    // 오버레이 닫고 GPS 시작
     document.getElementById('permission-overlay').style.display = 'none';
     startGPS();
   }
@@ -252,12 +245,11 @@
     cloud.setAttribute('animation__fade', 'property: scale;    to: 0 0 0;  dur: 800; easing: easeInCubic');
 
     catchBtn.style.display = 'none';
-    hud.textContent = arStage === 'second' ? '☁ 구름빵을 만들어요!' : '☁ 구름을 땄어요!';
+    hud.textContent = '☁ 구름을 땄어요!';
 
     setTimeout(() => {
-      sessionStorage.setItem('arReturn', arStage);
-      sessionStorage.removeItem('arStage');
-      window.location.href = 'book.html';
+      sessionStorage.setItem('caughtCloud', '1');
+      window.location.href = 'book1.html';
     }, 900);
   }
 </script>
