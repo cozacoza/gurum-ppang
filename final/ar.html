@@ -104,7 +104,7 @@
   -->
   <a-entity
     id="cloud-entity"
-    gps-entity-place="latitude: 37.654648; longitude: 127.013473"
+    gps-entity-place="latitude: 37.638141; longitude: 127.025789"
     position="0 3 0"
     animation="property: position; to: 0 3.6 0; dur: 2000; dir: alternate; loop: true; easing: easeInOutSine">
 
@@ -154,9 +154,15 @@
 
 
 <script>
+  // ── 방문 단계 ──
+  const arStage = sessionStorage.getItem('arStage') || 'first';
+  if (arStage === 'second') {
+    document.getElementById('catch-btn').textContent = '☁ 구름빵 만들기!';
+  }
+
   // ── 설정값 ──
-  const TARGET_LAT = 37.655934;
-  const TARGET_LNG = 127.013159;
+  const TARGET_LAT = 37.638141;
+  const TARGET_LNG = 127.025789;
   const CATCH_RADIUS = 15;   // 이 거리(m) 안에서 구름 따기 버튼 표시
   const VISIBLE_RADIUS = 80; // 이 거리(m) 밖이면 "너무 멀어요" 오버레이
 
@@ -237,14 +243,12 @@
     cloud.setAttribute('animation__fade', 'property: scale; to: 0 0 0; dur: 800; easing: easeInCubic');
 
     catchBtn.style.display = 'none';
-    hud.textContent = '☁ 구름을 땄어요!';
+    hud.textContent = arStage === 'second' ? '☁ 구름빵을 만들어요!' : '☁ 구름을 땄어요!';
 
-    // 0.9초 후 요리 게임 페이지로 이동
     setTimeout(() => {
-      // index.html의 요리 게임으로 이동
-      // 구름을 땄다는 신호를 sessionStorage에 저장
-      sessionStorage.setItem('cloud_caught', 'true');
-      window.location.href = 'index.html#game';
+      sessionStorage.setItem('arReturn', arStage);
+      sessionStorage.removeItem('arStage');
+      window.location.href = 'book.html';
     }, 900);
   }
 </script>
