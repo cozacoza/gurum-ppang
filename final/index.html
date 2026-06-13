@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>구름빵</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; overflow:hidden; background:#000; }
+    iframe {
+      position:fixed; inset:0;
+      width:100%; height:100%;
+      border:none;
+    }
+  </style>
+</head>
+<body>
+
+<audio id="ost" src="ost.mp3" loop preload="auto"></audio>
+
+<iframe
+  id="frame"
+  src="book1.html"
+  allow="camera; microphone; geolocation; accelerometer; gyroscope; magnetometer"
+  allowfullscreen>
+</iframe>
+
+<script>
+  // iframe 안쪽이 처음 상호작용하면 OST 시작
+  const ost = document.getElementById('ost');
+  ost.volume = 0.5;
+
+  let started = false;
+  function startOST() {
+    if (started) return;
+    started = true;
+    ost.play().catch(() => {});
+  }
+
+  // iframe 내부 클릭/터치가 부모까지 전파되지 않으므로
+  // iframe의 load 이후 postMessage로 신호 받거나,
+  // 부모 window 자체 첫 상호작용으로 시작
+  window.addEventListener('click',     startOST, { once: true });
+  window.addEventListener('touchstart', startOST, { once: true });
+
+  // iframe 안에서 postMessage('ostStart') 보내면 시작
+  window.addEventListener('message', e => {
+    if (e.data === 'ostStart') startOST();
+  });
+</script>
+</body>
+</html>
