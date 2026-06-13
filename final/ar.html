@@ -96,29 +96,29 @@
     <!-- 구름 본체: position으로 높이 조절, scale 없앰 -->
     <a-entity
       id="cloud-inner"
-      position="0 4 0"
-      animation="property: position; to: 0 5 0; dur: 2000; dir: alternate; loop: true; easing: easeInOutSine">
+      position="0 3 0"
+      animation="property: position; to: 0 3.4 0; dur: 2000; dir: alternate; loop: true; easing: easeInOutSine">
 
-      <!-- ✅ radius를 기존 × 8로 직접 키움 (scale 대신) -->
-      <a-sphere color="#e8f4ff" radius="9.6"  position="0 0 0"         opacity="0.92"></a-sphere>
-      <a-sphere color="#ddeeff" radius="7.2"  position="-8.8 -1.6 0"   opacity="0.90"></a-sphere>
-      <a-sphere color="#ddeeff" radius="8.0"  position="8.8 -0.8 0"    opacity="0.90"></a-sphere>
-      <a-sphere color="#f0f8ff" radius="5.6"  position="-5.6 4.8 0"    opacity="0.88"></a-sphere>
-      <a-sphere color="#f0f8ff" radius="6.0"  position="5.6 5.6 0"     opacity="0.88"></a-sphere>
-      <a-sphere color="#ffffff" radius="5.2"  position="0 8.0 0"       opacity="0.85"></a-sphere>
-      <a-sphere color="#eef6ff" radius="4.4"  position="2.4 0.8 6.4"   opacity="0.80"></a-sphere>
-      <a-sphere color="#eef6ff" radius="4.0"  position="-2.4 0 5.6"    opacity="0.80"></a-sphere>
+      <!-- 나무에 걸쳐 보이는 크기 (반지름 1~2m 수준) -->
+      <a-sphere color="#e8f4ff" radius="1.2"  position="0 0 0"          opacity="0.92"></a-sphere>
+      <a-sphere color="#ddeeff" radius="0.9"  position="-1.1 -0.2 0"    opacity="0.90"></a-sphere>
+      <a-sphere color="#ddeeff" radius="1.0"  position="1.1 -0.1 0"     opacity="0.90"></a-sphere>
+      <a-sphere color="#f0f8ff" radius="0.7"  position="-0.7 0.6 0"     opacity="0.88"></a-sphere>
+      <a-sphere color="#f0f8ff" radius="0.75" position="0.7 0.7 0"      opacity="0.88"></a-sphere>
+      <a-sphere color="#ffffff" radius="0.65" position="0 1.0 0"        opacity="0.85"></a-sphere>
+      <a-sphere color="#eef6ff" radius="0.55" position="0.3 0.1 0.8"    opacity="0.80"></a-sphere>
+      <a-sphere color="#eef6ff" radius="0.5"  position="-0.3 0 0.7"     opacity="0.80"></a-sphere>
 
       <!-- 반짝이 파티클 -->
-      <a-sphere color="#ffffaa" radius="0.6" position="12 8 1.6"
-        animation="property: position; to: 12.8 11.2 1.6; dur: 1800; dir: alternate; loop: true;"></a-sphere>
-      <a-sphere color="#aaffdd" radius="0.56" position="-11.2 6.4 0.8"
-        animation="property: position; to: -12 9.6 0.8; dur: 2200; dir: alternate; loop: true;"></a-sphere>
-      <a-sphere color="#ffddaa" radius="0.48" position="1.6 12.8 2.4"
-        animation="property: position; to: 2.4 16 2.4; dur: 1500; dir: alternate; loop: true;"></a-sphere>
+      <a-sphere color="#ffffaa" radius="0.08" position="1.5 1.0 0.2"
+        animation="property: position; to: 1.6 1.4 0.2; dur: 1800; dir: alternate; loop: true;"></a-sphere>
+      <a-sphere color="#aaffdd" radius="0.07" position="-1.4 0.8 0.1"
+        animation="property: position; to: -1.5 1.2 0.1; dur: 2200; dir: alternate; loop: true;"></a-sphere>
+      <a-sphere color="#ffddaa" radius="0.06" position="0.2 1.6 0.3"
+        animation="property: position; to: 0.3 2.0 0.3; dur: 1500; dir: alternate; loop: true;"></a-sphere>
 
       <!-- 투명 클릭 영역 -->
-      <a-sphere color="#ffffff" radius="17.6" opacity="0" class="clickable" cursor-listener></a-sphere>
+      <a-sphere color="#ffffff" radius="2.2" opacity="0" class="clickable" cursor-listener></a-sphere>
     </a-entity>
   </a-entity>
 
