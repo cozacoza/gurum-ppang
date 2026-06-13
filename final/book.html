@@ -23,18 +23,93 @@
       transition:color 0.8s ease;
     }
     @keyframes hintPulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
-    #go-ar {
-      display:none; position:fixed; bottom:36px; left:50%;
-      transform:translateX(-50%);
-      padding:13px 30px; background:rgba(20,60,20,0.92); color:#c8ffb0;
-      border:1px solid rgba(100,200,80,0.5); border-radius:30px;
-      font-size:18px; font-family:serif; cursor:pointer; z-index:200;
-      white-space:nowrap; animation:arGlow 2.5s ease-in-out infinite;
+    /* ── AR 상태창 패널 ── */
+    #ar-panel {
+      display:none; position:fixed; inset:0; z-index:150;
+      background:rgba(0,5,18,0.82); backdrop-filter:blur(4px);
+      align-items:center; justify-content:center;
     }
-    @keyframes arGlow {
-      0%,100%{ box-shadow:0 0 14px rgba(60,180,60,0.35); }
-      50%    { box-shadow:0 0 30px rgba(60,180,60,0.7); }
+    #ar-panel.show { display:flex; }
+    .hud-glow {
+      animation:hudPulse 3s ease-in-out infinite;
+      filter:drop-shadow(0 0 6px rgba(0,215,255,.95)) drop-shadow(0 0 22px rgba(0,150,255,.6)) drop-shadow(0 0 55px rgba(0,100,200,.3));
     }
+    @keyframes hudPulse {
+      0%,100%{filter:drop-shadow(0 0 6px rgba(0,215,255,.9)) drop-shadow(0 0 22px rgba(0,150,255,.55)) drop-shadow(0 0 55px rgba(0,100,200,.25))}
+      50%    {filter:drop-shadow(0 0 11px rgba(0,235,255,1))  drop-shadow(0 0 35px rgba(0,180,255,.75)) drop-shadow(0 0 75px rgba(0,130,230,.45))}
+    }
+    .hud-frame {
+      position:relative; width:min(88vw,400px);
+      background:rgba(0,10,28,0.97);
+      border:1.5px solid rgba(0,210,255,0.85);
+      clip-path:polygon(20px 0%,calc(100% - 20px) 0%,100% 20px,100% calc(100% - 20px),calc(100% - 20px) 100%,20px 100%,0% calc(100% - 20px),0% 20px);
+      overflow:hidden;
+    }
+    .hud-frame::before {
+      content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+      background:repeating-linear-gradient(0deg,rgba(0,200,255,.022) 0px,rgba(0,200,255,.022) 1px,transparent 1px,transparent 5px);
+    }
+    .hud-frame::after {
+      content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+      background:radial-gradient(ellipse at 18% 10%,rgba(0,140,255,.07) 0%,transparent 60%);
+    }
+    .hud-header {
+      position:relative; z-index:1;
+      display:flex; align-items:center; gap:10px;
+      padding:15px 22px 11px;
+      border-bottom:1px solid rgba(0,200,255,0.22);
+    }
+    .hud-header-icon {
+      font-size:18px; color:rgba(0,230,255,0.9);
+      animation:iconBlink 2s step-start infinite;
+    }
+    @keyframes iconBlink{0%,89%{opacity:1}90%,99%{opacity:.15}}
+    .hud-header-title {
+      flex:1; font-family:'Courier New',monospace;
+      font-size:10px; letter-spacing:3.5px;
+      color:rgba(0,220,255,0.85); text-shadow:0 0 8px rgba(0,210,255,.7);
+      text-transform:uppercase;
+    }
+    .hud-header-dots { font-size:10px; color:rgba(0,170,200,0.45); letter-spacing:2px; }
+    .hud-body {
+      position:relative; z-index:1;
+      padding:26px 26px 18px; text-align:center;
+    }
+    .hud-cloud-icon {
+      display:block; font-size:54px; margin-bottom:16px;
+      filter:drop-shadow(0 0 14px rgba(150,225,255,.95));
+      animation:cloudFloat 2.8s ease-in-out infinite;
+    }
+    @keyframes cloudFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    .hud-mission-title {
+      font-size:16px; font-weight:700; letter-spacing:1px; margin-bottom:14px;
+      color:rgba(0,235,255,1); text-shadow:0 0 10px rgba(0,205,255,.85);
+      font-family:'Malgun Gothic','맑은 고딕',sans-serif;
+    }
+    #hud-msg {
+      font-size:14px; line-height:2.1; letter-spacing:0.3px;
+      color:rgba(180,238,255,0.88);
+      font-family:'Malgun Gothic','맑은 고딕',sans-serif;
+    }
+    .hud-footer {
+      position:relative; z-index:1;
+      display:flex; gap:10px; padding:13px 20px 17px;
+      border-top:1px solid rgba(0,200,255,0.18); justify-content:center;
+    }
+    .hud-btn {
+      padding:11px 22px; font-size:13px; letter-spacing:1.5px;
+      border:1px solid; cursor:pointer; background:transparent;
+      transition:background .15s;
+      clip-path:polygon(8px 0%,calc(100%-8px) 0%,100% 8px,100% calc(100%-8px),calc(100%-8px) 100%,8px 100%,0% calc(100%-8px),0% 8px);
+      font-family:'Malgun Gothic','맑은 고딕',sans-serif;
+    }
+    .hud-btn-cancel { color:rgba(0,170,195,.6); border-color:rgba(0,170,195,.35); }
+    .hud-btn-cancel:active { background:rgba(0,170,195,.12); }
+    .hud-btn-go {
+      color:rgba(0,232,255,1); border-color:rgba(0,215,255,.8);
+      background:rgba(0,80,140,.18); text-shadow:0 0 6px rgba(0,210,255,.6);
+    }
+    .hud-btn-go:active { background:rgba(0,150,220,.3); }
     #page-num {
       position:fixed; bottom:14px; left:50%;
       transform:translateX(-50%);
@@ -49,7 +124,26 @@
 <canvas id="flip-canvas"></canvas>
 <div id="touch-layer"></div>
 <div id="hint">오른쪽을 터치하면 책이 열려요</div>
-<button id="go-ar" onclick="location.href='ar.html'">☁ 구름 따러 가기</button>
+<div id="ar-panel">
+  <div class="hud-glow">
+    <div class="hud-frame">
+      <div class="hud-header">
+        <span class="hud-header-icon">◈</span>
+        <span class="hud-header-title">MISSION ALERT</span>
+        <span class="hud-header-dots">· · · · ·</span>
+      </div>
+      <div class="hud-body">
+        <span class="hud-cloud-icon">☁</span>
+        <div class="hud-mission-title" id="hud-title"></div>
+        <p id="hud-msg"></p>
+      </div>
+      <div class="hud-footer">
+        <button class="hud-btn hud-btn-cancel" onclick="closeARPanel()">[ 뒤로 ]</button>
+        <button class="hud-btn hud-btn-go" id="hud-go-btn" onclick="goToAR()"></button>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="page-num"></div>
 
 <script>
@@ -148,9 +242,6 @@ function fadeVolume(audio, targetVol, durationMs) {
 let phase       = 'black';
 let fadeStart   = 0;    // fadein 시작 타임스탬프
 const FADE_DUR  = 4400; // ms (2배)
-let openStart   = 0;
-const OPEN_DUR  = 800;
-let bgZoom      = 1;
 
 // ════════════════════════════════════════
 //  촛불
@@ -226,26 +317,6 @@ function loop(ts) {
     }
     drawCandles(ts);
 
-  } else if (phase === 'opening') {
-    // cover → book 전환: 검은화면 → main2 줌아웃 등장
-    const p    = Math.min((ts - openStart) / OPEN_DUR, 1);
-    const ease = 1 - Math.pow(1-p, 3);
-    const zoom = 1.3 - 0.3*ease;
-    if (bgImg.naturalWidth > 0) {
-      drawBg(zoom);
-    } else {
-      mCtx.fillStyle='#1a0f05'; mCtx.fillRect(0,0,W,H);
-    }
-    drawCandles(ts);
-    if (p >= 1) {
-      phase = 'book';
-      drawStatic();
-      updateUI();
-      tl.style.pointerEvents = 'auto';
-      // 빗소리 시작 (파일에 페이드인 내장)
-      rainAudio.play().catch(()=>{});
-    }
-
   } else if (phase === 'book') {
     if (bgImg.naturalWidth > 0) drawBg(1);
     else { mCtx.fillStyle='#1a0f05'; mCtx.fillRect(0,0,W,H); }
@@ -259,13 +330,27 @@ function loop(ts) {
 //  시퀀스 시작 (cover + bg 로드 후)
 // ════════════════════════════════════════
 function startSequence() {
+  const arReturn = sessionStorage.getItem('arReturn');
+  if (arReturn) {
+    sessionStorage.removeItem('arReturn');
+    curSpread = 5;
+    phase = 'book';
+    drawStatic();
+    updateUI();
+    tl.style.pointerEvents = 'auto';
+    candleAudio.play().catch(()=>{});
+    fadeVolume(candleAudio, 0.15, 1500);
+    rainAudio.play().catch(()=>{});
+    fadeVolume(rainAudio, 0.7, 1500);
+    return;
+  }
   // 1초 검은화면 유지 후 fadein 시작
   setTimeout(() => {
     fadeStart = performance.now();
     phase = 'fadein';
     // 캔들 소리 시작 — 페이드인과 함께 서서히 커짐
     candleAudio.play().catch(()=>{});
-    fadeVolume(candleAudio, 0.5, 4400);
+    fadeVolume(candleAudio, 0.15, 4400);
   }, 1000);
 }
 
@@ -279,8 +364,10 @@ function goToBook() {
   if (phase !== 'cover') return;
   tl.style.pointerEvents = 'none';
   hint.style.color = 'rgba(255,220,140,0)';
-  openStart = performance.now();
-  phase = 'opening';
+  phase = 'book';
+  drawStatic();
+  updateUI();
+  tl.style.pointerEvents = 'auto';
 }
 
 // ════════════════════════════════════════
@@ -326,6 +413,10 @@ function doFlip() {
   else {
     flipping=false;
     if(flipDir===1)curSpread++;else curSpread--;
+    if(curSpread===1 && flipDir===1 && rainAudio.paused) {
+      rainAudio.play().catch(()=>{});
+      fadeVolume(rainAudio, 0.7, 2000);
+    }
     drawStatic(); updateUI();
   }
 }
@@ -365,12 +456,39 @@ function flipSlices(ctx,img,region,progress) {
 // ════════════════════════════════════════
 //  UI & 터치
 // ════════════════════════════════════════
+const AR_PANEL_DATA = {
+  first:  { title:'홍비를 도와주세요!',  msg:'비가 와서 구름이 나무에 걸렸어요.<br>키가 작은 홍비 대신<br>구름을 따주세요!',   btn:'구름 따러 가기 →' },
+  second: { title:'구름빵을 만들어요!',  msg:'구름을 가져왔어요.<br>이제 구름빵을 만들 차례예요.<br>함께 만들러 가볼까요?', btn:'구름빵 만들기 →' },
+};
+
 function updateUI() {
-  const goAR=document.getElementById('go-ar');
   const pgNum=document.getElementById('page-num');
-  pgNum.textContent=`${curSpread+1} / ${TOTAL_SPREADS}`;
-  if(curSpread>=TOTAL_SPREADS-1){goAR.style.display='block';pgNum.style.display='none';}
-  else{goAR.style.display='none';pgNum.style.display='block';}
+  const isAR = curSpread>=TOTAL_SPREADS-2;
+  pgNum.style.display = isAR ? 'none' : 'block';
+  if(!isAR) pgNum.textContent=`${curSpread+1} / ${TOTAL_SPREADS}`;
+}
+
+function openARPanel() {
+  const stage = curSpread===TOTAL_SPREADS-2 ? 'first' : 'second';
+  const d = AR_PANEL_DATA[stage];
+  document.getElementById('hud-title').textContent = d.title;
+  document.getElementById('hud-msg').innerHTML = d.msg;
+  document.getElementById('hud-go-btn').textContent = '[ '+d.btn+' ]';
+  document.getElementById('ar-panel').classList.add('show');
+}
+
+function closeARPanel() {
+  document.getElementById('ar-panel').classList.remove('show');
+}
+
+function goToAR() {
+  sessionStorage.setItem('arStage', curSpread===TOTAL_SPREADS-2 ? 'first' : 'second');
+  location.href='ar.html';
+}
+
+function handleTap(goRight) {
+  if(goRight && curSpread>=TOTAL_SPREADS-2){ openARPanel(); return; }
+  startFlip(goRight?1:-1);
 }
 
 let touchStartX=0;
@@ -379,13 +497,13 @@ tl.addEventListener('touchend',e=>{
   if(phase==='cover'){goToBook();return;}
   if(phase!=='book'||flipping)return;
   const dx=e.changedTouches[0].clientX-touchStartX;
-  if(Math.abs(dx)>30)startFlip(dx<0?1:-1);
-  else startFlip(e.changedTouches[0].clientX>W/2?1:-1);
+  const goRight=Math.abs(dx)>30?dx<0:e.changedTouches[0].clientX>W/2;
+  handleTap(goRight);
 },{passive:true});
 tl.addEventListener('click',e=>{
   if(phase==='cover'){goToBook();return;}
   if(phase!=='book'||flipping)return;
-  startFlip(e.clientX>W/2?1:-1);
+  handleTap(e.clientX>W/2);
 });
 </script>
 </body>
