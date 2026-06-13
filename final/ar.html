@@ -5,14 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>구름빵 AR</title>
 
-  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-  <!-- AR.js Location-based (GPS) — 버전 고정 -->
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.0/aframe/build/aframe-ar.js"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: 'Gaegu', cursive; }
+
+    /* iOS 권한 요청 오버레이 */
+    #permission-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      text-align: center;
+      padding: 32px;
+      gap: 20px;
+    }
+    #permission-overlay h2 { font-size: 22px; }
+    #permission-overlay p  { font-size: 15px; color: #ccc; line-height: 1.8; }
+    #permission-btn {
+      background: #00c864;
+      color: #003a18;
+      border: none;
+      padding: 16px 40px;
+      border-radius: 30px;
+      font-size: 20px;
+      font-weight: 700;
+      cursor: pointer;
+    }
 
     #distance-hud {
       position: fixed;
@@ -69,6 +95,13 @@
 </head>
 <body>
 
+<!-- iOS 방향센서 권한 요청 (버튼 클릭으로만 트리거 가능) -->
+<div id="permission-overlay">
+  <h2>☁ 구름빵 AR</h2>
+  <p>구름을 찾으려면<br>위치와 방향 센서 권한이 필요해요</p>
+  <button id="permission-btn" onclick="requestPermissions()">시작하기</button>
+</div>
+
 <div id="distance-hud">📍 위치 확인 중...</div>
 <button id="catch-btn" onclick="catchCloud()">☁ 구름 따기!</button>
 
@@ -78,28 +111,23 @@
   <p>공원 나무 앞으로<br>이동해주세요 🌳</p>
 </div>
 
-<!-- ═══ A-Frame AR 씬 ═══ -->
 <a-scene
   vr-mode-ui="enabled: false"
   arjs="sourceType: webcam; debugUIEnabled: false; locationEnabled: true;"
   renderer="antialias: true; alpha: true"
   embedded>
 
-  <!-- ✅ gps-new-camera 사용 -->
-  <a-camera gps-new-camera rotation-reader></a-camera>
+  <a-camera gps-new-camera rotation-reader look-controls="enabled: false"></a-camera>
 
-  <!-- ✅ gps-new-entity-place 사용, scale 제거 -->
   <a-entity
     id="cloud-entity"
     gps-new-entity-place="latitude: 37.638141; longitude: 127.025789">
 
-    <!-- 구름 본체: position으로 높이 조절, scale 없앰 -->
     <a-entity
       id="cloud-inner"
       position="0 3 0"
       animation="property: position; to: 0 3.4 0; dur: 2000; dir: alternate; loop: true; easing: easeInOutSine">
 
-      <!-- 전체 지름 약 1~2m -->
       <a-sphere color="#e8f4ff" radius="0.3"  position="0 0 0"           opacity="0.92"></a-sphere>
       <a-sphere color="#ddeeff" radius="0.22" position="-0.28 -0.05 0"   opacity="0.90"></a-sphere>
       <a-sphere color="#ddeeff" radius="0.25" position="0.28 -0.03 0"    opacity="0.90"></a-sphere>
@@ -109,7 +137,6 @@
       <a-sphere color="#eef6ff" radius="0.14" position="0.08 0.03 0.2"   opacity="0.80"></a-sphere>
       <a-sphere color="#eef6ff" radius="0.12" position="-0.08 0 0.18"    opacity="0.80"></a-sphere>
 
-      <!-- 반짝이 파티클 -->
       <a-sphere color="#ffffaa" radius="0.02" position="0.38 0.25 0.05"
         animation="property: position; to: 0.4 0.35 0.05; dur: 1800; dir: alternate; loop: true;"></a-sphere>
       <a-sphere color="#aaffdd" radius="0.018" position="-0.35 0.2 0.03"
@@ -117,7 +144,6 @@
       <a-sphere color="#ffddaa" radius="0.015" position="0.05 0.4 0.08"
         animation="property: position; to: 0.08 0.5 0.08; dur: 1500; dir: alternate; loop: true;"></a-sphere>
 
-      <!-- 투명 클릭 영역 -->
       <a-sphere color="#ffffff" radius="0.55" opacity="0" class="clickable" cursor-listener></a-sphere>
     </a-entity>
   </a-entity>
@@ -141,6 +167,39 @@
   const catchBtn = document.getElementById('catch-btn');
   const tooFar   = document.getElementById('too-far');
   const farText  = document.getElementById('far-dist-text');
+
+  // iOS DeviceOrientation 권한 요청 — 반드시 버튼 클릭으로 호출
+  async function requestPermissions() {
+    // iOS 13+ 방향 센서 권한
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const result = await DeviceOrientationEvent.requestPermission();
+        if (result !== 'granted') {
+          alert('방향 센서 권한을 허용해야 AR이 정상 작동해요.\n설정 > Safari > 동작 및 방향에서 허용해주세요.');
+          return;
+        }
+      } catch(e) {
+        console.warn('DeviceOrientation 권한 오류:', e);
+      }
+    }
+
+    // 오버레이 닫고 GPS 시작
+    document.getElementById('permission-overlay').style.display = 'none';
+    startGPS();
+  }
+
+  function startGPS() {
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(onPosition, onError, {
+        enableHighAccuracy: true,
+        maximumAge: 3000,
+        timeout: 10000
+      });
+    } else {
+      hud.textContent = '⚠ GPS를 지원하지 않는 브라우저예요';
+    }
+  }
 
   function calcDistance(lat1, lng1, lat2, lng2) {
     const R = 6371000;
@@ -179,16 +238,6 @@
     console.warn('GPS 오류:', err.message);
   }
 
-  if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(onPosition, onError, {
-      enableHighAccuracy: true,
-      maximumAge: 3000,
-      timeout: 10000
-    });
-  } else {
-    hud.textContent = '⚠ GPS를 지원하지 않는 브라우저예요';
-  }
-
   AFRAME.registerComponent('cursor-listener', {
     init: function () {
       this.el.addEventListener('click', function () {
@@ -198,7 +247,6 @@
   });
 
   function catchCloud() {
-    // ✅ GPS 앵커(cloud-entity) 말고 자식(cloud-inner)을 움직임
     const cloud = document.getElementById('cloud-inner');
     cloud.setAttribute('animation__up',   'property: position; to: 0 30 0; dur: 800; easing: easeInCubic');
     cloud.setAttribute('animation__fade', 'property: scale;    to: 0 0 0;  dur: 800; easing: easeInCubic');
