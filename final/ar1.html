@@ -45,6 +45,7 @@
       animation:cloudFloat 3s ease-in-out infinite;
     }
     #cloud-wrap.visible { display:flex; }
+  
     @keyframes cloudFloat {
       0%,100% { transform:translateX(-50%) translateY(0); }
       50%      { transform:translateX(-50%) translateY(-22px); }
@@ -215,7 +216,7 @@
     const { latitude, longitude } = pos.coords;
     const dist = Math.round(calcDistance(latitude, longitude, TARGET_LAT, TARGET_LNG));
 
-    hud.textContent = `📍 나무까지 ${dist}m`;
+    hud.textContent = `📍 나무까지 ${dist}m  |  ${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
 
     if (dist <= CATCH_RADIUS) {
       hud.style.background = 'rgba(0,160,80,0.7)';
