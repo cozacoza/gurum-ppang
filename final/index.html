@@ -62,15 +62,19 @@
 
   let unlocked = false;
   let candleOn = false, rainOn = false, ostOn = false;
+  const pending = new Set();
 
   function begin() {
     if (unlocked) return;
     unlocked = true;
-    // 유저 제스처 안에서 오디오 잠금 해제 (iOS Safari 대응)
-    [candle, rain, ost].forEach(a => {
-      a.play().then(() => a.pause()).catch(() => {});
-    });
     document.getElementById('start-screen').style.display = 'none';
+    // 유저 제스처 안에서 잠금 해제 후 pending 메시지 처리
+    Promise.all([candle, rain, ost].map(a =>
+      a.play().then(() => a.pause()).catch(() => {})
+    )).then(() => {
+      pending.forEach(msg => playAudio(msg));
+      pending.clear();
+    });
   }
 
   function fadeVol(audio, target, ms) {
@@ -84,24 +88,31 @@
     }, iv);
   }
 
-  window.addEventListener('message', e => {
-    if (e.data === 'candleStart' && !candleOn) {
+  function playAudio(msg) {
+    if (msg === 'candleStart' && !candleOn) {
       candleOn = true;
       candle.currentTime = 0;
       candle.play().catch(() => {});
       fadeVol(candle, 0.15, 4400);
     }
-    if (e.data === 'rainStart' && !rainOn) {
+    if (msg === 'rainStart' && !rainOn) {
       rainOn = true;
       rain.currentTime = 0;
       rain.play().catch(() => {});
       fadeVol(rain, 0.7, 2000);
     }
-    if (e.data === 'ostStart' && !ostOn) {
+    if (msg === 'ostStart' && !ostOn) {
       ostOn = true;
       ost.currentTime = 0;
       ost.play().catch(() => {});
       fadeVol(ost, 0.5, 2000);
+    }
+  }
+
+  window.addEventListener('message', e => {
+    if (['candleStart', 'rainStart', 'ostStart'].includes(e.data)) {
+      if (unlocked) playAudio(e.data);
+      else pending.add(e.data);  // 잠금 해제 전 도착한 신호 보관
     }
   });
 </script>
