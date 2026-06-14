@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>구름빵</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { width:100%; height:100%; overflow:hidden; background:#000; }
+    canvas { position:fixed; inset:0; width:100%; height:100%; }
+    #main-canvas { z-index:0; }
+    #page-canvas { z-index:5;  pointer-events:none; }
+    #flip-canvas { z-index:10; pointer-events:none; }
+    #touch-layer { z-index:20; position:fixed; inset:0; pointer-events:none; }
+    #page-num {
+      position:fixed; bottom:14px; left:50%;
+      transform:translateX(-50%);
+      color:rgba(255,200,100,0.3); font-size:12px; font-family:serif;
+      letter-spacing:2px; pointer-events:none; z-index:30;
+    }
+  </style>
+</head>
+<body>
+<canvas id="main-canvas"></canvas>
+<canvas id="page-canvas"></canvas>
+<canvas id="flip-canvas"></canvas>
+<div id="touch-layer"></div>
+<div id="page-num"></div>
+
+<script>
+// ════════════════════════════════════════
+//  설정 — book2용 페이지 이미지로 교체
+// ════════════════════════════════════════
+const SPREADS = [
+  ['book2_page1_left.png', 'book2_page1_right.png'],
+  ['book2_page2_left.png', 'book2_page2_right.png'],
+  ['book2_page3_left.png', 'book2_page3_right.png'],
+];
+const TOTAL_SPREADS = SPREADS.length;
+const ORIG_W = 1088, ORIG_H = 645;
+const L = { x:200, y:101, w:348, h:498 };
+const R = { x:543, y:94,  w:377, h:507 };
+
+// ════════════════════════════════════════
+//  캔버스
+// ════════════════════════════════════════
+const mc   = document.getElementById('main-canvas');
+const mCtx = mc.getContext('2d');
+const pc   = document.getElementById('page-canvas');
+const pCtx = pc.getContext('2d');
+const fc   = document.getElementById('flip-canvas');
+const fCtx = fc.getContext('2d');
+const tl   = document.getElementById('touch-layer');
+
+let W, H, imgScale, imgOffX, imgOffY;
+function resize() {
+  W = mc.width = pc.width = fc.width = window.innerWidth;
+  H = mc.height= pc.height= fc.height= window.innerHeight;
+  const sx = W/ORIG_W, sy = H/ORIG_H;
+  imgScale = Math.max(sx, sy);
+  imgOffX  = (W - ORIG_W*imgScale) / 2;
+  imgOffY  = (H - ORIG_H*imgScale) / 2;
+}
+resize();
+window.addEventListener('resize', () => { resize(); if(phase==='book') drawStatic(); });
+
+function toScr(r) {
+  return { x:imgOffX+r.x*imgScale, y:imgOffY+r.y*imgScale,
+           w:r.w*imgScale, h:r.h*imgScale };
+}
+
+// ════════════════════════════════════════
+//  이미지 로드
+// ════════════════════════════════════════
+const bgImg = new Image(); bgImg.src = 'main2.jpg';
+const pageImgs = {};
+SPREADS.forEach(([l,r]) => {
+  const li = new Image(); li.src = l; pageImgs[l] = li;
+  const ri = new Image(); ri.src = r; pageImgs[r] = ri;
+});
+
+let bgReady = false;
+bgImg.onload  = () => { bgReady = true; startBook(); };
+bgImg.onerror = () => { bgReady = true; startBook(); };
+
+// ════════════════════════════════════════
+//  오디오
+// ════════════════════════════════════════
+const rainAudio = new Audio('rain.mp3');
+rainAudio.loop   = true;
+rainAudio.volume = 0;
+
+function fadeVolume(audio, targetVol, durationMs) {
+  const startVol = audio.volume;
+  const diff     = targetVol - startVol;
+  const steps    = 40;
+  const interval = durationMs / steps;
+  let step = 0;
+  const timer = setInterval(() => {
+    step++;
+    audio.volume = Math.min(1, Math.max(0, startVol + diff * (step / steps)));
+    if (step >= steps) clearInterval(timer);
+  }, interval);
+}
+
+// ════════════════════════════════════════
+//  촛불
+// ════════════════════════════════════════
+const candles = [
+  { xR:0.36, yR:0.02, r:0.28, phase:0,   speed:0.0017 },
+  { xR:0.65, yR:0.08, r:0.25, phase:1.8, speed:0.0021 },
+];
+function flicker(t, ph, sp) {
+  return (Math.sin(t*sp*1.0+ph)*0.40 + Math.sin(t*sp*2.73+ph+0.5)*0.25 +
+          Math.sin(t*sp*5.17+ph+1.2)*0.15 + Math.sin(t*sp*9.31+ph+2.1)*0.08 +
+          Math.sin(t*sp*17.6+ph+0.9)*0.04) / 0.92;
+}
+function drawCandles(t) {
+  mCtx.fillStyle = 'rgba(0,0,0,0.42)'; mCtx.fillRect(0,0,W,H);
+  candles.forEach(c => {
+    const f=flicker(t,c.phase,c.speed), cx=W*c.xR, cy=H*c.yR;
+    const r=Math.min(W,H)*c.r*(1+f*0.12), a=0.52+f*0.18;
+    const gr=mCtx.createRadialGradient(cx,cy,0,cx,cy,r);
+    gr.addColorStop(0,`rgba(255,230,150,${a})`);
+    gr.addColorStop(0.2,`rgba(255,180,80,${a*0.55})`);
+    gr.addColorStop(0.5,`rgba(200,120,40,${a*0.22})`);
+    gr.addColorStop(1,'rgba(0,0,0,0)');
+    mCtx.globalCompositeOperation='screen';
+    mCtx.fillStyle=gr; mCtx.fillRect(0,0,W,H);
+    mCtx.globalCompositeOperation='source-over';
+  });
+  const vig=mCtx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.2,W/2,H/2,Math.max(W,H)*0.75);
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.6)');
+  mCtx.fillStyle=vig; mCtx.fillRect(0,0,W,H);
+}
+function drawBg() {
+  if (bgImg.naturalWidth > 0)
+    mCtx.drawImage(bgImg, imgOffX, imgOffY, ORIG_W*imgScale, ORIG_H*imgScale);
+  else { mCtx.fillStyle='#1a0f05'; mCtx.fillRect(0,0,W,H); }
+}
+
+// ════════════════════════════════════════
+//  메인 루프
+// ════════════════════════════════════════
+let phase = 'book';
+function loop(ts) {
+  mCtx.clearRect(0,0,W,H);
+  drawBg();
+  drawCandles(ts);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ════════════════════════════════════════
+//  시작
+// ════════════════════════════════════════
+function startBook() {
+  drawStatic();
+  updateUI();
+  tl.style.pointerEvents = 'auto';
+  rainAudio.play().catch(()=>{});
+  fadeVolume(rainAudio, 0.6, 1500);
+}
+
+// ════════════════════════════════════════
+//  페이지 그리기
+// ════════════════════════════════════════
+let curSpread = 0;
+function drawPage(ctx, src, region) {
+  const s = toScr(region);
+  const img = pageImgs[src];
+  if (img && img.complete && img.naturalWidth > 0)
+    ctx.drawImage(img, s.x, s.y, s.w, s.h);
+}
+function drawStatic() {
+  pCtx.clearRect(0,0,W,H);
+  fCtx.clearRect(0,0,W,H);
+  drawPage(pCtx, SPREADS[curSpread][0], L);
+  drawPage(pCtx, SPREADS[curSpread][1], R);
+}
+
+// ════════════════════════════════════════
+//  페이지 플립
+// ════════════════════════════════════════
+let flipping=false, flipDir=1, flipStart2=0;
+const FLIP_DUR=650;
+
+function startFlip(dir) {
+  if(flipping) return;
+  if(dir===1  && curSpread>=TOTAL_SPREADS-1) return;
+  if(dir===-1 && curSpread<=0) return;
+  flipDir=dir; flipping=true; flipStart2=performance.now();
+  doFlip();
+}
+function doFlip() {
+  const prog = Math.min((performance.now()-flipStart2)/FLIP_DUR, 1);
+  fCtx.clearRect(0,0,W,H);
+  const from=flipDir===1?curSpread:curSpread-1;
+  const to  =flipDir===1?curSpread+1:curSpread;
+  drawPage(fCtx,SPREADS[to][0],L);
+  drawPage(fCtx,SPREADS[to][1],R);
+  flipSlices(fCtx,pageImgs[SPREADS[from][1]],R,prog);
+  drawPage(fCtx,SPREADS[from][0],L);
+  if(prog<1) requestAnimationFrame(doFlip);
+  else {
+    flipping=false;
+    if(flipDir===1) curSpread++; else curSpread--;
+    drawStatic(); updateUI();
+  }
+}
+function flipSlices(ctx,img,region,progress) {
+  const s=toScr(region), sw=Math.ceil(s.w), sh=Math.ceil(s.h);
+  const p=flipDir===1?progress:1-progress;
+  const ease=p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+  const foldX=1-ease;
+  const tmp=document.createElement('canvas');
+  tmp.width=sw; tmp.height=sh;
+  const tc=tmp.getContext('2d');
+  if(img&&img.complete&&img.naturalWidth>0) tc.drawImage(img,0,0,sw,sh);
+  ctx.save();
+  for(let i=0;i<60;i++){
+    const t=i/60; if(t>=foldX)continue;
+    const t1=(i+1)/60, xPos=t*foldX;
+    const bend=Math.sin(ease*Math.PI)*sh*0.05;
+    const yB=Math.sin(t*Math.PI)*bend, hSc=1-Math.abs(yB)/sh*0.04;
+    const shd=Math.min(0.5,ease*(1-t)*1.1);
+    const sX=t*sw,sW=(t1-t)*sw,dX=s.x+xPos*s.w,dW=sW*foldX,dY=s.y+yB,dH=s.h*hSc;
+    if(dW<=0)continue;
+    ctx.drawImage(tmp,sX,0,sW,sh,dX,dY,Math.max(0.5,dW),dH);
+    if(shd>0.02){ctx.fillStyle=`rgba(0,0,0,${shd*0.6})`;ctx.fillRect(dX,dY,Math.max(0.5,dW),dH);}
+    const hl=Math.max(0,0.12-Math.abs(t-foldX)*3)*(1-ease);
+    if(hl>0.01){ctx.fillStyle=`rgba(255,240,190,${hl})`;ctx.fillRect(dX,dY,Math.max(0.5,dW),dH);}
+  }
+  ctx.restore();
+  const bW=Math.min(s.w*(1-foldX)*0.25,s.w*0.12), bX=s.x+foldX*s.w;
+  if(bW>1){
+    const bg=ctx.createLinearGradient(bX,0,bX+bW,0);
+    bg.addColorStop(0,'rgba(200,170,110,0.45)');
+    bg.addColorStop(1,'rgba(180,150,90,0.05)');
+    ctx.fillStyle=bg; ctx.fillRect(bX,s.y,bW,s.h);
+  }
+}
+
+// ════════════════════════════════════════
+//  UI & 터치
+// ════════════════════════════════════════
+function updateUI() {
+  const pgNum = document.getElementById('page-num');
+  pgNum.style.display = 'block';
+  pgNum.textContent = `${curSpread + 1} / ${TOTAL_SPREADS}`;
+}
+
+function handleTap(goRight) {
+  startFlip(goRight ? 1 : -1);
+}
+
+let touchStartX = 0;
+tl.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive:true });
+tl.addEventListener('touchend', e => {
+  if (flipping) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const goRight = Math.abs(dx) > 30 ? dx < 0 : e.changedTouches[0].clientX > W/2;
+  handleTap(goRight);
+}, { passive:true });
+tl.addEventListener('click', e => {
+  if (flipping) return;
+  handleTap(e.clientX > W/2);
+});
+</script>
+</body>
+</html>
