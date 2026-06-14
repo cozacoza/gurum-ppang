@@ -8,12 +8,14 @@
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-    body { overflow:hidden; font-family:'Malgun Gothic','맑은 고딕',sans-serif; }
+    body { overflow:hidden; font-family:'Malgun Gothic','맑은 고딕',sans-serif; background:#000; }
+
+    /* A-Frame 씬은 동적 주입 후 이 스타일 적용 */
     a-scene { position:fixed; inset:0; }
 
     #permission-overlay {
       position:fixed; inset:0; z-index:9999;
-      background:rgba(0,0,0,0.88);
+      background:rgba(0,0,0,0.92);
       color:white; display:flex; flex-direction:column;
       align-items:center; justify-content:center;
       text-align:center; padding:32px; gap:20px;
@@ -31,6 +33,7 @@
       background:rgba(0,0,0,0.6); color:#00ff80;
       font-size:14px; padding:8px 18px; border-radius:20px;
       z-index:999; white-space:nowrap; pointer-events:none;
+      display:none;
     }
 
     #catch-btn {
@@ -59,32 +62,8 @@
 </head>
 <body>
 
-<!-- AR 씬 (A-Frame + AR.js GPS 위치 기반) -->
-<a-scene
-  vr-mode-ui="enabled: false"
-  arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
-  renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true;"
-  embedded
->
-  <!-- 구름 — 목표 GPS 좌표에 고정 -->
-  <a-entity
-    id="cloud-entity"
-    gps-entity-place="latitude: 37.6527468; longitude: 127.0162982;"
-    visible="false"
-  >
-    <!-- 지면에서 10m 위, 전체 크기 약 60cm -->
-    <a-entity position="0 3 0" scale="0.332 0.332 0.332">
-      <a-sphere position="0 0 0"     radius="3.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
-      <a-sphere position="-3.5 1 0"  radius="2.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
-      <a-sphere position="3.5 1 0"   radius="2.2" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
-      <a-sphere position="0 2.8 0"   radius="2.3" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
-      <a-sphere position="-1.5 3 0"  radius="1.8" color="white" opacity="0.90" material="shader:flat;"></a-sphere>
-      <a-sphere position="1.5 2.5 0" radius="1.6" color="white" opacity="0.90" material="shader:flat;"></a-sphere>
-    </a-entity>
-  </a-entity>
-
-  <a-camera gps-camera rotation-reader></a-camera>
-</a-scene>
+<!-- A-Frame 씬은 여기에 동적으로 주입됨 -->
+<div id="ar-container"></div>
 
 <div id="distance-hud">📍 위치 확인 중...</div>
 
@@ -108,11 +87,11 @@
   const CATCH_RADIUS   = 15;
   const VISIBLE_RADIUS = 80;
 
-  const hud         = document.getElementById('distance-hud');
-  const catchBtn    = document.getElementById('catch-btn');
-  const tooFar      = document.getElementById('too-far');
-  const farText     = document.getElementById('far-dist-text');
-  const cloudEntity = document.getElementById('cloud-entity');
+  const hud      = document.getElementById('distance-hud');
+  const catchBtn = document.getElementById('catch-btn');
+  const tooFar   = document.getElementById('too-far');
+  const farText  = document.getElementById('far-dist-text');
+  let   cloudEntity = null;
 
   function calcDistance(lat1, lng1, lat2, lng2) {
     const R = 6371000;
@@ -124,7 +103,7 @@
   }
 
   async function requestPermissions() {
-    // iOS 13+ 방향 센서 권한
+    // iOS 13+: 방향 센서 권한을 먼저 받아야 gps-camera가 나침반 데이터를 수신함
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
       try {
@@ -132,8 +111,46 @@
         if (r !== 'granted') { alert('방향 센서 권한을 허용해야 AR이 정상 작동해요.'); return; }
       } catch(e) {}
     }
+
     document.getElementById('permission-overlay').style.display = 'none';
+    hud.style.display = 'block';
+
+    // 권한 허용 후에 A-Frame 씬 주입 → gps-camera가 리스너 등록 시점에 권한 이미 있음
+    injectARScene();
     startGPS();
+  }
+
+  function injectARScene() {
+    document.getElementById('ar-container').innerHTML = `
+      <a-scene
+        id="ar-scene"
+        vr-mode-ui="enabled: false"
+        arjs="sourceType: webcam; debugUIEnabled: false;"
+        renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true;"
+        embedded
+      >
+        <a-entity
+          id="cloud-entity"
+          gps-entity-place="latitude: ${TARGET_LAT}; longitude: ${TARGET_LNG};"
+          visible="false"
+        >
+          <a-entity position="0 3 0" scale="0.111 0.111 0.111">
+            <a-sphere position="0 0 0"     radius="3.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
+            <a-sphere position="-3.5 1 0"  radius="2.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
+            <a-sphere position="3.5 1 0"   radius="2.2" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
+            <a-sphere position="0 2.8 0"   radius="2.3" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
+            <a-sphere position="-1.5 3 0"  radius="1.8" color="white" opacity="0.90" material="shader:flat;"></a-sphere>
+            <a-sphere position="1.5 2.5 0" radius="1.6" color="white" opacity="0.90" material="shader:flat;"></a-sphere>
+          </a-entity>
+        </a-entity>
+        <a-camera gps-camera rotation-reader></a-camera>
+      </a-scene>
+    `;
+
+    const scene = document.getElementById('ar-scene');
+    scene.addEventListener('loaded', () => {
+      cloudEntity = document.getElementById('cloud-entity');
+    });
   }
 
   function startGPS() {
@@ -147,6 +164,8 @@
     const { latitude, longitude } = pos.coords;
     const dist = Math.round(calcDistance(latitude, longitude, TARGET_LAT, TARGET_LNG));
     hud.textContent = `📍 나무까지 ${dist}m  |  ${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
+
+    if (!cloudEntity) return;
 
     if (dist > VISIBLE_RADIUS) {
       cloudEntity.setAttribute('visible', 'false');
@@ -166,7 +185,7 @@
 
   function catchCloud() {
     catchBtn.style.display = 'none';
-    cloudEntity.setAttribute('visible', 'false');
+    if (cloudEntity) cloudEntity.setAttribute('visible', 'false');
     hud.textContent = '☁ 구름을 땄어요!';
     setTimeout(() => {
       sessionStorage.setItem('caughtCloud', '1');
