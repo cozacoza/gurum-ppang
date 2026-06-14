@@ -2,18 +2,15 @@
 <html>
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
   <title>구름빵 AR — 구름 따기</title>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-    body { overflow:hidden; background:#000; font-family:'Malgun Gothic','맑은 고딕',sans-serif; }
+    body { overflow:hidden; font-family:'Malgun Gothic','맑은 고딕',sans-serif; }
+    a-scene { position:fixed; inset:0; }
 
-    #camera {
-      position:fixed; inset:0; width:100%; height:100%;
-      object-fit:cover; z-index:0;
-    }
-
-    /* ── iOS 권한 요청 ── */
     #permission-overlay {
       position:fixed; inset:0; z-index:9999;
       background:rgba(0,0,0,0.88);
@@ -29,7 +26,6 @@
       font-size:20px; font-weight:700; cursor:pointer;
     }
 
-    /* ── 거리 HUD ── */
     #distance-hud {
       position:fixed; top:16px; left:50%; transform:translateX(-50%);
       background:rgba(0,0,0,0.6); color:#00ff80;
@@ -37,65 +33,6 @@
       z-index:999; white-space:nowrap; pointer-events:none;
     }
 
-    /* ── CSS 구름 ── */
-    #cloud-wrap {
-      position:fixed;
-      z-index:10; display:none;
-      flex-direction:column; align-items:center;
-      animation:cloudFloat 3s ease-in-out infinite;
-    }
-    #cloud-wrap.visible { display:flex; }
-  
-    @keyframes cloudFloat {
-      0%,100% { transform:translateX(-50%) translateY(0px); }
-      50%      { transform:translateX(-50%) translateY(-22px); }
-    }
-
-    .cloud-body {
-      position:relative;
-      width:min(220px,54vw); height:min(90px,22vw);
-      background:rgba(255,255,255,0.92);
-      border-radius:999px;
-      box-shadow:
-        0 0 0 2px rgba(255,255,255,0.5),
-        0 12px 40px rgba(0,0,0,0.25),
-        0 0 60px rgba(200,230,255,0.5);
-      filter:drop-shadow(0 0 18px rgba(180,220,255,0.7));
-    }
-    /* 구름 위 볼록한 부분들 */
-    .cloud-body::before {
-      content:'';
-      position:absolute;
-      width:47%; height:160%;
-      background:rgba(245,250,255,0.95);
-      border-radius:50%;
-      top:-55%; left:18%;
-      box-shadow:0 0 0 2px rgba(255,255,255,0.4);
-    }
-    .cloud-body::after {
-      content:'';
-      position:absolute;
-      width:35%; height:130%;
-      background:rgba(240,248,255,0.90);
-      border-radius:50%;
-      top:-38%; left:50%;
-      box-shadow:0 0 0 2px rgba(255,255,255,0.3);
-    }
-    /* 작은 반짝임 */
-    .cloud-sparkle {
-      position:absolute; font-size:min(16px,4vw);
-      animation:sparkle 2s ease-in-out infinite;
-      pointer-events:none;
-    }
-    .cloud-sparkle:nth-child(1){ top:-20%; left:10%; animation-delay:0s; }
-    .cloud-sparkle:nth-child(2){ top:-30%; right:15%; animation-delay:0.7s; }
-    .cloud-sparkle:nth-child(3){ top:-10%; right:8%;  animation-delay:1.3s; }
-    @keyframes sparkle {
-      0%,100%{ opacity:0.3; transform:scale(0.8); }
-      50%     { opacity:1;   transform:scale(1.2); }
-    }
-
-    /* ── 잡기 버튼 ── */
     #catch-btn {
       display:none;
       position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
@@ -109,7 +46,6 @@
       50%     { transform:translateX(-50%) scale(1.06); }
     }
 
-    /* ── 너무 멀어요 ── */
     #too-far {
       display:none; position:fixed; inset:0;
       background:rgba(0,0,0,0.75); color:white;
@@ -119,39 +55,38 @@
     #too-far h2  { font-size:24px; margin-bottom:12px; }
     #too-far p   { font-size:16px; line-height:1.8; color:#aaa; }
     #too-far .dist-text { font-size:28px; color:#f0c060; margin:16px 0; }
-
-    /* ── 수집 애니메이션 ── */
-    #cloud-wrap.catching {
-      animation:cloudCatch 0.8s ease-in forwards;
-    }
-    @keyframes cloudCatch {
-      0%  { transform:translateX(-50%) translateY(0) scale(1); opacity:1; }
-      100%{ transform:translateX(-50%) translateY(-120px) scale(0.1); opacity:0; }
-    }
   </style>
 </head>
 <body>
 
-<video id="camera" autoplay muted playsinline></video>
+<!-- AR 씬 (A-Frame + AR.js GPS 위치 기반) -->
+<a-scene
+  vr-mode-ui="enabled: false"
+  arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
+  renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true;"
+  embedded
+>
+  <!-- 구름 — 목표 GPS 좌표에 고정 -->
+  <a-entity
+    id="cloud-entity"
+    gps-entity-place="latitude: 37.6527429; longitude: 127.0163955;"
+    visible="false"
+  >
+    <!-- 지면에서 10m 위에 구름 배치 -->
+    <a-entity position="0 10 0">
+      <a-sphere position="0 0 0"     radius="3.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
+      <a-sphere position="-3.5 1 0"  radius="2.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
+      <a-sphere position="3.5 1 0"   radius="2.2" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
+      <a-sphere position="0 2.8 0"   radius="2.3" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
+      <a-sphere position="-1.5 3 0"  radius="1.8" color="white" opacity="0.90" material="shader:flat;"></a-sphere>
+      <a-sphere position="1.5 2.5 0" radius="1.6" color="white" opacity="0.90" material="shader:flat;"></a-sphere>
+    </a-entity>
+  </a-entity>
 
-<div id="permission-overlay">
-  <h2>☁ 구름빵 AR</h2>
-  <p>구름을 찾으려면<br>위치와 카메라 권한이 필요해요</p>
-  <button id="permission-btn" onclick="requestPermissions()">시작하기</button>
-</div>
+  <a-camera gps-camera rotation-reader></a-camera>
+</a-scene>
 
 <div id="distance-hud">📍 위치 확인 중...</div>
-
-<!-- CSS 구름 -->
-<div id="cloud-wrap">
-  <div class="cloud-body">
-    <span class="cloud-sparkle">✨</span>
-    <span class="cloud-sparkle">⭐</span>
-    <span class="cloud-sparkle">✨</span>
-  </div>
-</div>
-
-<button id="catch-btn" onclick="catchCloud()">☁ 구름 따기!</button>
 
 <div id="too-far">
   <h2>☁ 구름이 저 멀리 있어요!</h2>
@@ -159,24 +94,26 @@
   <p>나무 앞으로<br>이동해주세요 🌳</p>
 </div>
 
+<button id="catch-btn" onclick="catchCloud()">☁ 구름 따기!</button>
+
+<div id="permission-overlay">
+  <h2>☁ 구름빵 AR</h2>
+  <p>구름을 찾으려면<br>위치와 카메라 권한이 필요해요</p>
+  <button id="permission-btn" onclick="requestPermissions()">시작하기</button>
+</div>
+
 <script>
   const TARGET_LAT     = 37.6527429;
   const TARGET_LNG     = 127.0163955;
   const CATCH_RADIUS   = 15;
   const VISIBLE_RADIUS = 80;
-  const H_FOV          = 62;   // 모바일 카메라 수평 화각(도)
 
-  const hud       = document.getElementById('distance-hud');
-  const catchBtn  = document.getElementById('catch-btn');
-  const tooFar    = document.getElementById('too-far');
-  const farText   = document.getElementById('far-dist-text');
-  const cloudWrap = document.getElementById('cloud-wrap');
+  const hud         = document.getElementById('distance-hud');
+  const catchBtn    = document.getElementById('catch-btn');
+  const tooFar      = document.getElementById('too-far');
+  const farText     = document.getElementById('far-dist-text');
+  const cloudEntity = document.getElementById('cloud-entity');
 
-  let userLat = null, userLng = null, userDist = Infinity;
-  let compassHeading = null;
-  let absOrientationSet = false;
-
-  // ── Haversine 거리 ──
   function calcDistance(lat1, lng1, lat2, lng2) {
     const R = 6371000;
     const dLat = (lat2-lat1)*Math.PI/180;
@@ -186,17 +123,8 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
-  // ── 목표 방위각 (북쪽 기준 시계 방향, 0~360) ──
-  function calcBearing(lat1, lng1, lat2, lng2) {
-    const dLng = (lng2-lng1)*Math.PI/180;
-    const lat1R = lat1*Math.PI/180, lat2R = lat2*Math.PI/180;
-    const y = Math.sin(dLng)*Math.cos(lat2R);
-    const x = Math.cos(lat1R)*Math.sin(lat2R) - Math.sin(lat1R)*Math.cos(lat2R)*Math.cos(dLng);
-    return ((Math.atan2(y,x)*180/Math.PI) + 360) % 360;
-  }
-
-  // ── 권한 요청 ──
   async function requestPermissions() {
+    // iOS 13+ 방향 센서 권한
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
       try {
@@ -205,15 +133,9 @@
       } catch(e) {}
     }
     document.getElementById('permission-overlay').style.display = 'none';
-    navigator.mediaDevices
-      .getUserMedia({ video:{ facingMode:'environment' }, audio:false })
-      .then(s => { document.getElementById('camera').srcObject = s; })
-      .catch(() => {});
     startGPS();
-    startCompass();
   }
 
-  // ── GPS ──
   function startGPS() {
     if (!navigator.geolocation) { hud.textContent = '⚠ GPS를 지원하지 않는 브라우저예요'; return; }
     navigator.geolocation.watchPosition(onPosition, onError, {
@@ -222,92 +144,29 @@
   }
 
   function onPosition(pos) {
-    userLat = pos.coords.latitude;
-    userLng = pos.coords.longitude;
-    userDist = calcDistance(userLat, userLng, TARGET_LAT, TARGET_LNG);
-    const dist = Math.round(userDist);
+    const { latitude, longitude } = pos.coords;
+    const dist = Math.round(calcDistance(latitude, longitude, TARGET_LAT, TARGET_LNG));
     hud.textContent = `📍 나무까지 ${dist}m`;
 
-    if (userDist > VISIBLE_RADIUS) {
-      cloudWrap.classList.remove('visible');
+    if (dist > VISIBLE_RADIUS) {
+      cloudEntity.setAttribute('visible', 'false');
       catchBtn.style.display = 'none';
-      tooFar.style.display = 'flex';
-      farText.textContent = `${dist}m`;
-      hud.style.background = 'rgba(0,0,0,0.6)';
+      tooFar.style.display   = 'flex';
+      farText.textContent    = `${dist}m`;
+      hud.style.background   = 'rgba(0,0,0,0.6)';
     } else {
-      tooFar.style.display = 'none';
-      hud.style.background = userDist <= CATCH_RADIUS ? 'rgba(0,160,80,0.7)' : 'rgba(0,0,0,0.6)';
-      positionCloud();
+      cloudEntity.setAttribute('visible', 'true');
+      tooFar.style.display   = 'none';
+      catchBtn.style.display = dist <= CATCH_RADIUS ? 'block' : 'none';
+      hud.style.background   = dist <= CATCH_RADIUS ? 'rgba(0,160,80,0.7)' : 'rgba(0,0,0,0.6)';
     }
   }
 
   function onError() { hud.textContent = '⚠ GPS 권한을 허용해주세요'; }
 
-  // ── 나침반 ──
-  function startCompass() {
-    // Android: deviceorientationabsolute 우선
-    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-    window.addEventListener('deviceorientation', handleOrientation, true);
-  }
-
-  function handleOrientation(e) {
-    if (e.type === 'deviceorientationabsolute' && e.alpha !== null) {
-      compassHeading = (360 - e.alpha) % 360;
-      absOrientationSet = true;
-    } else if (!absOrientationSet) {
-      if (e.webkitCompassHeading != null) {
-        // iOS: 북쪽 기준 시계 방향으로 바로 제공
-        compassHeading = e.webkitCompassHeading;
-      } else if (e.alpha !== null) {
-        compassHeading = (360 - e.alpha) % 360;
-      }
-    }
-    if (userDist <= VISIBLE_RADIUS) positionCloud();
-  }
-
-  // ── 구름 화면 위치 계산 ──
-  function positionCloud() {
-    if (userLat === null) return;
-
-    if (compassHeading === null) {
-      // 나침반 미지원 → 화면 중앙 상단 폴백
-      cloudWrap.style.left = '50%';
-      cloudWrap.style.top  = '22%';
-      cloudWrap.classList.add('visible');
-      catchBtn.style.display = userDist <= CATCH_RADIUS ? 'block' : 'none';
-      return;
-    }
-
-    const bearing = calcBearing(userLat, userLng, TARGET_LAT, TARGET_LNG);
-    let diff = bearing - compassHeading;
-    // -180 ~ +180 정규화
-    while (diff >  180) diff -= 360;
-    while (diff < -180) diff += 360;
-
-    // 화각 밖이면 숨김
-    if (Math.abs(diff) > H_FOV / 2) {
-      cloudWrap.classList.remove('visible');
-      catchBtn.style.display = 'none';
-      return;
-    }
-
-    // X: 화각 내 비율 → 화면 가로 비율
-    const xPct = 50 + (diff / H_FOV) * 100;
-    // Y: 멀수록 지평선(화면 중간), 가까울수록 위쪽
-    const yPct = 15 + (Math.min(userDist, VISIBLE_RADIUS) / VISIBLE_RADIUS) * 20;
-
-    cloudWrap.style.left = xPct + '%';
-    cloudWrap.style.top  = yPct + '%';
-    cloudWrap.classList.add('visible');
-    catchBtn.style.display = userDist <= CATCH_RADIUS ? 'block' : 'none';
-  }
-
-  // ── 구름 따기 ──
   function catchCloud() {
     catchBtn.style.display = 'none';
-    cloudWrap.classList.remove('visible');
-    cloudWrap.style.display = 'flex';
-    cloudWrap.classList.add('catching');
+    cloudEntity.setAttribute('visible', 'false');
     hud.textContent = '☁ 구름을 땄어요!';
     setTimeout(() => {
       sessionStorage.setItem('caughtCloud', '1');
