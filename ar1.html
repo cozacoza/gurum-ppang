@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>구름빵 AR — 구름 따기</title>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body { overflow:hidden; font-family:'Malgun Gothic','맑은 고딕',sans-serif; }
+    a-scene { position:fixed; inset:0; }
+
+    #instruction {
+      position:fixed; top:20px; left:50%; transform:translateX(-50%);
+      background:rgba(0,0,0,0.65); color:white;
+      font-size:15px; padding:10px 22px; border-radius:20px;
+      z-index:999; white-space:nowrap; pointer-events:none;
+    }
+
+    #catch-btn {
+      display:none;
+      position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
+      background:rgba(0,200,100,0.92); color:#003a18;
+      border:none; padding:16px 36px; border-radius:30px;
+      font-size:22px; font-weight:700; cursor:pointer; z-index:999;
+      animation:pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100%{ transform:translateX(-50%) scale(1); }
+      50%     { transform:translateX(-50%) scale(1.06); }
+    }
+  </style>
+</head>
+<body>
+
+<a-scene
+  mindar-image="imageTargetSrc: targets.mind; autoStart: true;"
+  color-space="sRGB"
+  renderer="colorManagement: true; physicallyCorrectLights: true;"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false"
+>
+  <a-assets>
+    <a-asset-item id="cloud-glb" src="cloud.glb"></a-asset-item>
+  </a-assets>
+
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+  <a-entity mindar-image-target="targetIndex: 0" id="target">
+    <!-- 마커 위에 구름 GLB -->
+    <a-gltf-model
+      id="cloud-obj"
+      src="#cloud-glb"
+      position="0 0.4 0"
+      scale="0.3 0.3 0.3"
+    ></a-gltf-model>
+  </a-entity>
+</a-scene>
+
+<div id="instruction">🐾 발자국 마커를 카메라로 비춰주세요</div>
+<button id="catch-btn" onclick="catchCloud()">☁ 구름 따기!</button>
+
+<script>
+  const target   = document.getElementById('target');
+  const cloudObj = document.getElementById('cloud-obj');
+  const catchBtn = document.getElementById('catch-btn');
+  const instr    = document.getElementById('instruction');
+
+  target.addEventListener('targetFound', () => {
+    instr.textContent = '☁ 구름을 발견했어요!';
+    catchBtn.style.display = 'block';
+  });
+
+  target.addEventListener('targetLost', () => {
+    instr.textContent = '🐾 발자국 마커를 카메라로 비춰주세요';
+    catchBtn.style.display = 'none';
+  });
+
+  let caught = false;
+  function catchCloud() {
+    if (caught) return;
+    caught = true;
+    catchBtn.style.display = 'none';
+    instr.textContent = '☁ 구름을 땄어요!';
+    cloudObj.setAttribute('animation',
+      'property: scale; to: 0 0 0; dur: 800; easing: easeInBack;'
+    );
+    setTimeout(() => {
+      sessionStorage.setItem('caughtCloud', '1');
+      window.location.href = 'book1.html';
+    }, 900);
+  }
+</script>
+</body>
+</html>
