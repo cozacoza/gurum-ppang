@@ -69,11 +69,11 @@
   <!-- 구름 — 목표 GPS 좌표에 고정 -->
   <a-entity
     id="cloud-entity"
-    gps-entity-place="latitude: 37.6527429; longitude: 127.0163955;"
+    gps-entity-place="latitude: 37.6527468; longitude: 127.0162982;"
     visible="false"
   >
     <!-- 지면에서 10m 위, 전체 크기 약 60cm -->
-    <a-entity position="0 10 0" scale="0.05 0.05 0.05">
+    <a-entity position="0 10 0" scale="0.083 0.083 0.083">
       <a-sphere position="0 0 0"     radius="3.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
       <a-sphere position="-3.5 1 0"  radius="2.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
       <a-sphere position="3.5 1 0"   radius="2.2" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
@@ -103,8 +103,8 @@
 </div>
 
 <script>
-  const TARGET_LAT     = 37.6527429;
-  const TARGET_LNG     = 127.0163955;
+  const TARGET_LAT     = 37.6527468;
+  const TARGET_LNG     = 127.0162982;
   const CATCH_RADIUS   = 15;
   const VISIBLE_RADIUS = 80;
 
