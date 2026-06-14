@@ -155,11 +155,11 @@
 //  설정
 // ════════════════════════════════════════
 const SPREADS = [
-  'spread1.jpg',
-  'spread2.jpg',
-  'spread3.jpg',
-  'spread4.jpg',
-  'spread5.jpg',
+  'spread1.png',
+  'spread2.png',
+  'spread3.png',
+  'spread4.png',
+  'spread5.png',
   'spread6.png',
 ];
 const TOTAL_SPREADS = SPREADS.length;
@@ -191,8 +191,8 @@ window.addEventListener('resize', () => { resize(); if(phase==='book') drawStati
 // ════════════════════════════════════════
 //  이미지 로드
 // ════════════════════════════════════════
-const coverImg = new Image(); coverImg.src = 'cover.jpg';
-const bgImg    = new Image(); bgImg.src    = 'changedmain__.jpg';
+const coverImg = new Image(); coverImg.src = 'cover.png';
+const bgImg    = new Image(); bgImg.src    = 'main2.jpg';
 
 
 
@@ -214,6 +214,26 @@ function tryStart() {
 // ════════════════════════════════════════
 //  오디오
 // ════════════════════════════════════════
+const candleAudio = new Audio('candle.mp3');
+candleAudio.loop   = true;
+candleAudio.volume = 0;
+
+const rainAudio = new Audio('rain.mp3');
+rainAudio.loop   = true;
+rainAudio.volume = 0;
+
+function fadeVolume(audio, targetVol, durationMs) {
+  const startVol = audio.volume;
+  const diff     = targetVol - startVol;
+  const steps    = 40;
+  const interval = durationMs / steps;
+  let step = 0;
+  const timer = setInterval(() => {
+    step++;
+    audio.volume = Math.min(1, Math.max(0, startVol + diff * (step / steps)));
+    if (step >= steps) clearInterval(timer);
+  }, interval);
+}
 
 let phase       = 'black';
 let fadeStart   = 0;
@@ -223,32 +243,31 @@ const FADE_DUR  = 4400;
 //  촛불
 // ════════════════════════════════════════
 const candles = [
-  { xR:0.37, yR:0.20, r:0.28, phase:0,   speed:0.0017 },
-  { xR:0.63, yR:0.25, r:0.25, phase:1.8, speed:0.0021 },
+  { xR:0.36, yR:0.02, r:0.28, phase:0,   speed:0.0017 },
+  { xR:0.65, yR:0.08, r:0.25, phase:1.8, speed:0.0021 },
 ];
 function flicker(t, ph, sp) {
   return (Math.sin(t*sp*1.0+ph)*0.40 + Math.sin(t*sp*2.73+ph+0.5)*0.25 +
           Math.sin(t*sp*5.17+ph+1.2)*0.15 + Math.sin(t*sp*9.31+ph+2.1)*0.08 +
           Math.sin(t*sp*17.6+ph+0.9)*0.04) / 0.92;
 }
-function drawCandles(t, ctx) {
-  ctx = ctx || mCtx;
-  ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(0,0,W,H);
+function drawCandles(t) {
+  mCtx.fillStyle = 'rgba(0,0,0,0.42)'; mCtx.fillRect(0,0,W,H);
   candles.forEach(c => {
     const f=flicker(t,c.phase,c.speed), cx=W*c.xR, cy=H*c.yR;
     const r=Math.min(W,H)*c.r*(1+f*0.12), a=0.52+f*0.18;
-    const gr=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    const gr=mCtx.createRadialGradient(cx,cy,0,cx,cy,r);
     gr.addColorStop(0,`rgba(255,230,150,${a})`);
     gr.addColorStop(0.2,`rgba(255,180,80,${a*0.55})`);
     gr.addColorStop(0.5,`rgba(200,120,40,${a*0.22})`);
     gr.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.globalCompositeOperation='screen';
-    ctx.fillStyle=gr; ctx.fillRect(0,0,W,H);
-    ctx.globalCompositeOperation='source-over';
+    mCtx.globalCompositeOperation='screen';
+    mCtx.fillStyle=gr; mCtx.fillRect(0,0,W,H);
+    mCtx.globalCompositeOperation='source-over';
   });
-  const vig=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.2,W/2,H/2,Math.max(W,H)*0.75);
+  const vig=mCtx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.2,W/2,H/2,Math.max(W,H)*0.75);
   vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.6)');
-  ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+  mCtx.fillStyle=vig; mCtx.fillRect(0,0,W,H);
 }
 function drawBg() {
   if (bgImg.naturalWidth > 0)
@@ -291,10 +310,9 @@ function loop(ts) {
     drawCandles(ts);
 
   } else if (phase === 'book') {
-    if (bgImg.naturalWidth > 0) drawBg();
+    if (bgImg.naturalWidth > 0) drawBg(1);
     else { mCtx.fillStyle='#1a0f05'; mCtx.fillRect(0,0,W,H); }
-    fCtx.clearRect(0,0,W,H);
-    drawCandles(ts, fCtx);
+    drawCandles(ts);
   }
 
   requestAnimationFrame(loop);
@@ -312,15 +330,18 @@ function startSequence() {
     drawStatic();
     updateUI();
     tl.style.pointerEvents = 'auto';
-    window.parent.postMessage('candleStart', '*');
-    window.parent.postMessage('rainStart', '*');
+    candleAudio.play().catch(()=>{});
+    fadeVolume(candleAudio, 0.15, 1500);
+    rainAudio.play().catch(()=>{});
+    fadeVolume(rainAudio, 0.7, 1500);
     return;
   }
   // 처음 시작 → 표지 페이드인
   setTimeout(() => {
     fadeStart = performance.now();
     phase = 'fadein';
-    window.parent.postMessage('candleStart', '*');
+    candleAudio.play().catch(()=>{});
+    fadeVolume(candleAudio, 0.15, 4400);
   }, 1000);
 }
 
@@ -365,15 +386,81 @@ function startFlip(dir) {
   if(flipping) return;
   if(dir===1  && curSpread>=TOTAL_SPREADS-1) return;
   if(dir===-1 && curSpread<=0) return;
-  flipping = true;
-  flipDir = dir;
-  if (dir===1) curSpread++; else curSpread--;
-  if (curSpread===1 && dir===1) {
-    window.parent.postMessage('rainStart', '*');
-    window.parent.postMessage('ostStart', '*');
+  flipDir=dir; flipping=true; flipStart2=performance.now();
+  doFlip();
+}
+function doFlip() {
+  const prog = Math.min((performance.now()-flipStart2)/FLIP_DUR, 1);
+  fCtx.clearRect(0,0,W,H);
+  const from = flipDir===1 ? curSpread : curSpread-1;
+  const to   = flipDir===1 ? curSpread+1 : curSpread;
+
+  const toImg   = spreadImgs[SPREADS[to]];
+  const fromImg = spreadImgs[SPREADS[from]];
+
+  // "to" 스프레드 전체 배경
+  if (toImg?.complete && toImg.naturalWidth > 0)
+    fCtx.drawImage(toImg, 0, 0, W, H);
+
+  // "from" 스프레드 오른쪽 절반 플립 애니메이션
+  flipSlices(fCtx, fromImg, prog);
+
+  // "from" 스프레드 왼쪽 절반 고정
+  if (fromImg?.complete && fromImg.naturalWidth > 0) {
+    fCtx.save();
+    fCtx.beginPath(); fCtx.rect(0, 0, W/2, H); fCtx.clip();
+    fCtx.drawImage(fromImg, 0, 0, W, H);
+    fCtx.restore();
   }
-  drawStatic(); updateUI();
-  flipping = false;
+
+  if (prog < 1) requestAnimationFrame(doFlip);
+  else {
+    flipping = false;
+    if (flipDir===1) curSpread++; else curSpread--;
+    if (curSpread===1 && flipDir===1 && rainAudio.paused) {
+      rainAudio.play().catch(()=>{});
+      fadeVolume(rainAudio, 0.7, 2000);
+    }
+    drawStatic(); updateUI();
+  }
+}
+function flipSlices(ctx, img, progress) {
+  const spineX = W / 2;
+  const sw = W - spineX;
+  const p = flipDir===1 ? progress : 1-progress;
+  const ease = p<0.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
+  const foldX = 1-ease;
+
+  const tmp = document.createElement('canvas');
+  tmp.width = Math.ceil(sw); tmp.height = H;
+  const tc = tmp.getContext('2d');
+  if (img?.complete && img.naturalWidth > 0)
+    tc.drawImage(img, spineX, 0, sw, H, 0, 0, Math.ceil(sw), H);
+
+  ctx.save();
+  for (let i = 0; i < 60; i++) {
+    const t = i/60; if (t >= foldX) continue;
+    const t1 = (i+1)/60, xPos = t*foldX;
+    const bend = Math.sin(ease*Math.PI)*H*0.05;
+    const yB = Math.sin(t*Math.PI)*bend, hSc = 1-Math.abs(yB)/H*0.04;
+    const shd = Math.min(0.5, ease*(1-t)*1.1);
+    const sX = t*sw, sW = (t1-t)*sw;
+    const dX = spineX+xPos*sw, dW = sW*foldX, dY = yB, dH = H*hSc;
+    if (dW <= 0) continue;
+    ctx.drawImage(tmp, sX, 0, sW, H, dX, dY, Math.max(0.5,dW), dH);
+    if (shd>0.02) { ctx.fillStyle=`rgba(0,0,0,${shd*0.6})`; ctx.fillRect(dX,dY,Math.max(0.5,dW),dH); }
+    const hl = Math.max(0, 0.12-Math.abs(t-foldX)*3)*(1-ease);
+    if (hl>0.01) { ctx.fillStyle=`rgba(255,240,190,${hl})`; ctx.fillRect(dX,dY,Math.max(0.5,dW),dH); }
+  }
+  ctx.restore();
+
+  const bW = Math.min(sw*(1-foldX)*0.25, sw*0.12), bX = spineX+foldX*sw;
+  if (bW > 1) {
+    const bg = ctx.createLinearGradient(bX,0,bX+bW,0);
+    bg.addColorStop(0,'rgba(200,170,110,0.45)');
+    bg.addColorStop(1,'rgba(180,150,90,0.05)');
+    ctx.fillStyle = bg; ctx.fillRect(bX, 0, bW, H);
+  }
 }
 
 // ════════════════════════════════════════
@@ -426,6 +513,8 @@ function goToNext() {
 }
 
 function handleTap(goRight) {
+  // 첫 탭에 부모 index.html에 OST 시작 신호
+  window.parent.postMessage('ostStart', '*');
 
   // page5 오른쪽 → ar1 패널 (구름 따기)
   if (goRight && !returnedFromAR1 && curSpread >= 4) {
@@ -441,10 +530,8 @@ function handleTap(goRight) {
 }
 
 let touchStartX = 0;
-let lastTouchTime = 0;
 tl.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive:true });
 tl.addEventListener('touchend', e => {
-  lastTouchTime = Date.now();
   if (phase === 'cover') { goToBook(); return; }
   if (phase !== 'book' || flipping) return;
   const dx = e.changedTouches[0].clientX - touchStartX;
@@ -452,7 +539,6 @@ tl.addEventListener('touchend', e => {
   handleTap(goRight);
 }, { passive:true });
 tl.addEventListener('click', e => {
-  if (Date.now() - lastTouchTime < 500) return; // touchend 직후 합성 click 무시
   if (phase === 'cover') { goToBook(); return; }
   if (phase !== 'book' || flipping) return;
   handleTap(e.clientX > W/2);
