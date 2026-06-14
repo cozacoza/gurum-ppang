@@ -39,7 +39,7 @@
 
     /* ── CSS 구름 ── */
     #cloud-wrap {
-      position:fixed; top:18%; left:50%; transform:translateX(-50%);
+      position:fixed;
       z-index:10; display:none;
       flex-direction:column; align-items:center;
       animation:cloudFloat 3s ease-in-out infinite;
@@ -47,7 +47,7 @@
     #cloud-wrap.visible { display:flex; }
   
     @keyframes cloudFloat {
-      0%,100% { transform:translateX(-50%) translateY(0); }
+      0%,100% { transform:translateX(-50%) translateY(0px); }
       50%      { transform:translateX(-50%) translateY(-22px); }
     }
 
@@ -160,10 +160,11 @@
 </div>
 
 <script>
-  const TARGET_LAT    = 37.6527429;
-  const TARGET_LNG    = 127.0163955;
-  const CATCH_RADIUS  = 15;
+  const TARGET_LAT     = 37.6527429;
+  const TARGET_LNG     = 127.0163955;
+  const CATCH_RADIUS   = 15;
   const VISIBLE_RADIUS = 80;
+  const H_FOV          = 62;   // 모바일 카메라 수평 화각(도)
 
   const hud       = document.getElementById('distance-hud');
   const catchBtn  = document.getElementById('catch-btn');
@@ -171,38 +172,11 @@
   const farText   = document.getElementById('far-dist-text');
   const cloudWrap = document.getElementById('cloud-wrap');
 
-  async function requestPermissions() {
-    if (typeof DeviceOrientationEvent !== 'undefined' &&
-        typeof DeviceOrientationEvent.requestPermission === 'function') {
-      try {
-        const result = await DeviceOrientationEvent.requestPermission();
-        if (result !== 'granted') {
-          alert('방향 센서 권한을 허용해야 AR이 정상 작동해요.');
-          return;
-        }
-      } catch(e) {}
-    }
-    document.getElementById('permission-overlay').style.display = 'none';
+  let userLat = null, userLng = null, userDist = Infinity;
+  let compassHeading = null;
+  let absOrientationSet = false;
 
-    // 카메라 시작
-    navigator.mediaDevices
-      .getUserMedia({ video:{ facingMode:'environment' }, audio:false })
-      .then(s => { document.getElementById('camera').srcObject = s; })
-      .catch(() => {});
-
-    startGPS();
-  }
-
-  function startGPS() {
-    if (!navigator.geolocation) {
-      hud.textContent = '⚠ GPS를 지원하지 않는 브라우저예요';
-      return;
-    }
-    navigator.geolocation.watchPosition(onPosition, onError, {
-      enableHighAccuracy:true, maximumAge:3000, timeout:10000
-    });
-  }
-
+  // ── Haversine 거리 ──
   function calcDistance(lat1, lng1, lat2, lng2) {
     const R = 6371000;
     const dLat = (lat2-lat1)*Math.PI/180;
@@ -212,35 +186,123 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
+  // ── 목표 방위각 (북쪽 기준 시계 방향, 0~360) ──
+  function calcBearing(lat1, lng1, lat2, lng2) {
+    const dLng = (lng2-lng1)*Math.PI/180;
+    const lat1R = lat1*Math.PI/180, lat2R = lat2*Math.PI/180;
+    const y = Math.sin(dLng)*Math.cos(lat2R);
+    const x = Math.cos(lat1R)*Math.sin(lat2R) - Math.sin(lat1R)*Math.cos(lat2R)*Math.cos(dLng);
+    return ((Math.atan2(y,x)*180/Math.PI) + 360) % 360;
+  }
+
+  // ── 권한 요청 ──
+  async function requestPermissions() {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const r = await DeviceOrientationEvent.requestPermission();
+        if (r !== 'granted') { alert('방향 센서 권한을 허용해야 AR이 정상 작동해요.'); return; }
+      } catch(e) {}
+    }
+    document.getElementById('permission-overlay').style.display = 'none';
+    navigator.mediaDevices
+      .getUserMedia({ video:{ facingMode:'environment' }, audio:false })
+      .then(s => { document.getElementById('camera').srcObject = s; })
+      .catch(() => {});
+    startGPS();
+    startCompass();
+  }
+
+  // ── GPS ──
+  function startGPS() {
+    if (!navigator.geolocation) { hud.textContent = '⚠ GPS를 지원하지 않는 브라우저예요'; return; }
+    navigator.geolocation.watchPosition(onPosition, onError, {
+      enableHighAccuracy:true, maximumAge:3000, timeout:10000
+    });
+  }
+
   function onPosition(pos) {
-    const { latitude, longitude } = pos.coords;
-    const dist = Math.round(calcDistance(latitude, longitude, TARGET_LAT, TARGET_LNG));
+    userLat = pos.coords.latitude;
+    userLng = pos.coords.longitude;
+    userDist = calcDistance(userLat, userLng, TARGET_LAT, TARGET_LNG);
+    const dist = Math.round(userDist);
+    hud.textContent = `📍 나무까지 ${dist}m`;
 
-    hud.textContent = `📍 나무까지 ${dist}m  |  ${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
-
-    if (dist <= CATCH_RADIUS) {
-      hud.style.background = 'rgba(0,160,80,0.7)';
-      cloudWrap.classList.add('visible');
-      catchBtn.style.display = 'block';
-      tooFar.style.display   = 'none';
-    } else if (dist <= VISIBLE_RADIUS) {
-      hud.style.background = 'rgba(0,0,0,0.6)';
-      cloudWrap.classList.add('visible');
-      catchBtn.style.display = 'none';
-      tooFar.style.display   = 'none';
-    } else {
-      hud.style.background = 'rgba(0,0,0,0.6)';
+    if (userDist > VISIBLE_RADIUS) {
       cloudWrap.classList.remove('visible');
       catchBtn.style.display = 'none';
-      tooFar.style.display   = 'flex';
-      farText.textContent    = `${dist}m`;
+      tooFar.style.display = 'flex';
+      farText.textContent = `${dist}m`;
+      hud.style.background = 'rgba(0,0,0,0.6)';
+    } else {
+      tooFar.style.display = 'none';
+      hud.style.background = userDist <= CATCH_RADIUS ? 'rgba(0,160,80,0.7)' : 'rgba(0,0,0,0.6)';
+      positionCloud();
     }
   }
 
-  function onError(err) {
-    hud.textContent = '⚠ GPS 권한을 허용해주세요';
+  function onError() { hud.textContent = '⚠ GPS 권한을 허용해주세요'; }
+
+  // ── 나침반 ──
+  function startCompass() {
+    // Android: deviceorientationabsolute 우선
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+    window.addEventListener('deviceorientation', handleOrientation, true);
   }
 
+  function handleOrientation(e) {
+    if (e.type === 'deviceorientationabsolute' && e.alpha !== null) {
+      compassHeading = (360 - e.alpha) % 360;
+      absOrientationSet = true;
+    } else if (!absOrientationSet) {
+      if (e.webkitCompassHeading != null) {
+        // iOS: 북쪽 기준 시계 방향으로 바로 제공
+        compassHeading = e.webkitCompassHeading;
+      } else if (e.alpha !== null) {
+        compassHeading = (360 - e.alpha) % 360;
+      }
+    }
+    if (userDist <= VISIBLE_RADIUS) positionCloud();
+  }
+
+  // ── 구름 화면 위치 계산 ──
+  function positionCloud() {
+    if (userLat === null) return;
+
+    if (compassHeading === null) {
+      // 나침반 미지원 → 화면 중앙 상단 폴백
+      cloudWrap.style.left = '50%';
+      cloudWrap.style.top  = '22%';
+      cloudWrap.classList.add('visible');
+      catchBtn.style.display = userDist <= CATCH_RADIUS ? 'block' : 'none';
+      return;
+    }
+
+    const bearing = calcBearing(userLat, userLng, TARGET_LAT, TARGET_LNG);
+    let diff = bearing - compassHeading;
+    // -180 ~ +180 정규화
+    while (diff >  180) diff -= 360;
+    while (diff < -180) diff += 360;
+
+    // 화각 밖이면 숨김
+    if (Math.abs(diff) > H_FOV / 2) {
+      cloudWrap.classList.remove('visible');
+      catchBtn.style.display = 'none';
+      return;
+    }
+
+    // X: 화각 내 비율 → 화면 가로 비율
+    const xPct = 50 + (diff / H_FOV) * 100;
+    // Y: 멀수록 지평선(화면 중간), 가까울수록 위쪽
+    const yPct = 15 + (Math.min(userDist, VISIBLE_RADIUS) / VISIBLE_RADIUS) * 20;
+
+    cloudWrap.style.left = xPct + '%';
+    cloudWrap.style.top  = yPct + '%';
+    cloudWrap.classList.add('visible');
+    catchBtn.style.display = userDist <= CATCH_RADIUS ? 'block' : 'none';
+  }
+
+  // ── 구름 따기 ──
   function catchCloud() {
     catchBtn.style.display = 'none';
     cloudWrap.classList.remove('visible');
