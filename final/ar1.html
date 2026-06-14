@@ -72,8 +72,8 @@
     gps-entity-place="latitude: 37.6527429; longitude: 127.0163955;"
     visible="false"
   >
-    <!-- 지면에서 10m 위에 구름 배치 -->
-    <a-entity position="0 10 0">
+    <!-- 지면에서 10m 위, 전체 크기 약 60cm -->
+    <a-entity position="0 10 0" scale="0.05 0.05 0.05">
       <a-sphere position="0 0 0"     radius="3.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
       <a-sphere position="-3.5 1 0"  radius="2.5" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
       <a-sphere position="3.5 1 0"   radius="2.2" color="white" opacity="0.95" material="shader:flat;"></a-sphere>
@@ -146,7 +146,7 @@
   function onPosition(pos) {
     const { latitude, longitude } = pos.coords;
     const dist = Math.round(calcDistance(latitude, longitude, TARGET_LAT, TARGET_LNG));
-    hud.textContent = `📍 나무까지 ${dist}m`;
+    hud.textContent = `📍 나무까지 ${dist}m  |  ${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
 
     if (dist > VISIBLE_RADIUS) {
       cloudEntity.setAttribute('visible', 'false');
